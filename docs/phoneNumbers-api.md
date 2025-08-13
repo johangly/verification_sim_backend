@@ -6,7 +6,7 @@ Esta documentación describe los endpoints disponibles para la gestión de núme
 
 ### 1. Obtener todos los números de teléfono
 
-- **Endpoint**: `GET /api/phoneNumbers`
+- **Endpoint**: `GET /phoneNumbers`
 - **Descripción**: Obtiene una lista de todos los números de teléfono registrados.
 - **Respuesta**:
   - **200 OK**: Lista de números de teléfono
@@ -14,7 +14,7 @@ Esta documentación describe los endpoints disponibles para la gestión de núme
 
 ### 2. Obtener un número de teléfono por ID
 
-- **Endpoint**: `GET /api/phoneNumbers/:id`
+- **Endpoint**: `GET /phoneNumbers/:id`
 - **Descripción**: Obtiene un número de teléfono específico por su ID.
 - **Parámetros de URL**:
   - `id`: ID del número de teléfono
@@ -25,7 +25,7 @@ Esta documentación describe los endpoints disponibles para la gestión de núme
 
 ### 3. Crear un nuevo número de teléfono
 
-- **Endpoint**: `POST /api/phoneNumbers`
+- **Endpoint**: `POST /phoneNumbers`
 - **Descripción**: Crea un nuevo número de teléfono.
 - **Body (JSON)**:
   ```json
@@ -41,7 +41,7 @@ Esta documentación describe los endpoints disponibles para la gestión de núme
 
 ### 4. Actualizar un número de teléfono
 
-- **Endpoint**: `PUT /api/phoneNumbers/:id`
+- **Endpoint**: `PUT /phoneNumbers/:id`
 - **Descripción**: Actualiza un número de teléfono existente.
 - **Parámetros de URL**:
   - `id`: ID del número de teléfono
@@ -60,7 +60,7 @@ Esta documentación describe los endpoints disponibles para la gestión de núme
 
 ### 5. Eliminar un número de teléfono
 
-- **Endpoint**: `DELETE /api/phoneNumbers/:id`
+- **Endpoint**: `DELETE /phoneNumbers/:id`
 - **Descripción**: Elimina un número de teléfono existente.
 - **Parámetros de URL**:
   - `id`: ID del número de teléfono
