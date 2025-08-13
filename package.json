@@ -1,0 +1,29 @@
+{
+  "name": "whatsapp-twilio-api",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "API para enviar mensajes por WhatsApp Business usando Twilio",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "twilio": "^4.13.0",
+    "cors": "^2.8.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "zod": "^4.0.15",
+    "mysql2": "^3.6.1",
+    "sequelize": "^6.35.2",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
+  }
+}
