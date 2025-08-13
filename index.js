@@ -52,7 +52,7 @@ app.post(`${API_PREFIX}/send-message`, async (req, res) => {
 });
 
 // Endpoint para verificar conexión
-app.use(`${API_PREFIX}/api/phonenumbers`, phoneNumbersRoutes);
+app.use(`${API_PREFIX}/phonenumbers`, phoneNumbersRoutes);
 
 app.get(`${API_PREFIX}/`, (req, res) => {
   res.json({ message: 'Bienvenido a la API' });
