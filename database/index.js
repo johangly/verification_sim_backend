@@ -1,17 +1,14 @@
-// index.js (Convertido a ES Modules, sin añadir nada más)
-
 'use strict';
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url'; // Necesario para __filename y __dirname
-import { Sequelize } from 'sequelize'; // Importa Sequelize (y DataTypes, que se usa)
-import _config from '../config/config.js'; // Importa la configuración como ES Module
+import { fileURLToPath } from 'url'; 
+import { Sequelize } from 'sequelize'; 
+import _config from '../config/config.js'; 
 
-// Recrea __filename y __dirname para módulos ES
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const basename = path.basename(__filename); // Define basename
+const basename = path.basename(__filename);
 
 const env = process.env.NODE_ENV || 'development';
 // Accede a la configuración específica del entorno desde el objeto _config
@@ -33,8 +30,6 @@ sequelize = new Sequelize(currentEnvConfig.database, currentEnvConfig.username, 
 // en la carpeta 'models' deben usar 'export default (sequelize, DataTypes) => { ... };'
 // en lugar de 'module.exports = (sequelize, DataTypes) => { ... };'
 
-// La carga de modelos ahora debe ser una función asíncrona porque `import()` es asíncrono.
-// Este bloque no se ejecutará hasta que `initializeModelsAndAssociations()` sea llamado.
 async function loadAndAssociateModels() {
   const modelFiles = fs
     .readdirSync(path.join(__dirname, 'models')) // Asume que los modelos están en una subcarpeta 'models'
