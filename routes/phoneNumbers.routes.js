@@ -1,6 +1,5 @@
 import express from 'express';
 import db from '../models/index.js';
-import validatePhoneNumber from '../utils/phoneValidator.js';
 const router = express.Router();
 
 // Obtener todos los números de teléfono

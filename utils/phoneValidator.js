@@ -11,7 +11,7 @@ export default function validatePhoneNumber(phoneNumber) {
     // [\s.-]?        Un espacio, guion o punto opcional
     // \d{4}          4 dígitos
     // $              Fin de la cadena
-    const phoneRegex = /^\+\d{1,3}\s?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{4}$/;
+    const phoneRegex = /^\+\d{1,3}\d{2,4}\d{3,4}\d{4}$/;
   
     return phoneRegex.test(phoneNumber);
   }

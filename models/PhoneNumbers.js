@@ -11,7 +11,7 @@ export default (sequelize, DataTypes) => {
         unique: true,
         validate: {
             is: {
-            args: /^\+\d{1,3}\s?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{4}$/,
+            args: /^\+\d{1,3}\d{2,4}\d{3,4}\d{4}$/,
             msg: "El número de teléfono no tiene un formato válido."
             },
         }
