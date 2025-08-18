@@ -3,7 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import logger from './utils/logger.js';
-import db from './models/index.js';
+import db from './database/index.js';
 import phoneNumbersRoutes from './routes/phoneNumbers.routes.js';
 import messagesRoutes from './routes/messages.routes.js';
 const app = express();
@@ -25,7 +25,7 @@ app.get(`${API_PREFIX}/`, (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3001;
-db.syncDatabase().then(() => {
+db.sequelize.authenticate().then(() => {
   app.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`);
   });

@@ -1,5 +1,5 @@
 import express from 'express';
-import db from '../models/index.js';
+import db from '../database/index.js';
 const router = express.Router();
 
 // Obtener todos los números de teléfono

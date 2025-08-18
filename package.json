@@ -1,6 +1,7 @@
 {
   "name": "whatsapp-twilio-api",
   "version": "1.0.0",
+  "type": "module",
   "description": "API para enviar mensajes por WhatsApp Business usando Twilio",
   "main": "index.js",
   "scripts": {

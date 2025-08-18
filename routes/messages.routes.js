@@ -1,5 +1,5 @@
 import express from 'express';
-import db from '../models/index.js';
+import db from '../database/index.js';
 import validatePhoneNumber from '../utils/phoneValidator.js';
 import twilio from 'twilio';
 
