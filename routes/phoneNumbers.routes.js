@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../database/index.js';
+
 const router = express.Router();
 
 // Obtener todos los números de teléfono
@@ -8,6 +9,7 @@ router.get('/', async (req, res) => {
     const phoneNumbers = await db.PhoneNumbers.findAll();
     res.json(phoneNumbers);
   } catch (error) {
+    console.log(error)
     res.status(500).json({ message: 'Error al obtener los números de teléfono' });
   }
 });

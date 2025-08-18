@@ -26,6 +26,7 @@ app.get(`${API_PREFIX}/`, (req, res) => {
 // Start server
 const PORT = process.env.PORT || 3001;
 db.sequelize.authenticate().then(() => {
+  db.initialize();
   app.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`);
   });

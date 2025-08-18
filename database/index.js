@@ -41,12 +41,13 @@ async function loadAndAssociateModels() {
         file.indexOf('.test.js') === -1
       );
     });
-
+    console.log("Modelos cargados:")
   for (const file of modelFiles) {
     const modelModule = await import(`./models/${file}`); // Importación dinámica asíncrona
     const modelDefinitionFunction = modelModule.default; // Accede al export default de la función del modelo
     const model = modelDefinitionFunction(sequelize, Sequelize.DataTypes); // Pasa DataTypes desde Sequelize
     db[model.name] = model;
+    console.log(`|||||| ${model.name} ||||||`);
   }
 
   // === Definición de Asociaciones ===
