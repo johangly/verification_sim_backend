@@ -1,9 +1,9 @@
 import express from 'express';
 import db from '../database/index.js';
-import validatePhoneNumber from '../utils/phoneValidator.js';
 import twilio from 'twilio';
 
 const router = express.Router();
+router.use(express.json());
 
 const templates = {
     // template de si o no, verificacion

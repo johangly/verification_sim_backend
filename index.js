@@ -6,10 +6,11 @@ import logger from './utils/logger.js';
 import db from './database/index.js';
 import phoneNumbersRoutes from './routes/phoneNumbers.routes.js';
 import messagesRoutes from './routes/messages.routes.js';
+import estadisticasRoutes from './routes/estadisticas.routes.js';
+
 const app = express();
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const API_PREFIX = process.env.API_PREFIX || '/verificationsim';
@@ -17,6 +18,9 @@ const API_PREFIX = process.env.API_PREFIX || '/verificationsim';
 // Endpoint para enviar mensajes
 app.use(`${API_PREFIX}/phonenumbers`, phoneNumbersRoutes);
 app.use(`${API_PREFIX}/messages`, messagesRoutes);
+app.use(`${API_PREFIX}/estadisticas`, estadisticasRoutes);
+
+app.use(express.json());
 
 // Endpoint para verificar conexión
 app.get(`${API_PREFIX}/`, (req, res) => {
