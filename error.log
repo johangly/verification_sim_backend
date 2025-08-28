@@ -74,3 +74,13 @@
 {"level":"error","message":"Uncaught Exception:","timestamp":"2025-08-18T16:21:21.318Z"}
 {"level":"error","message":"Uncaught Exception: multer is not defined","stack":"ReferenceError: multer is not defined\n    at file:///root/git/verificationSim/Server/routes/phoneNumbers.routes.js:6:16\n    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)","timestamp":"2025-08-20T22:20:18.760Z"}
 {"level":"error","message":"Uncaught Exception:","timestamp":"2025-08-20T22:20:18.766Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:24:57.608Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:25:09.713Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:26:05.077Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:40:12.991Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:40:53.841Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:43:00.448Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:43:27.147Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:43:51.017Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:43:56.447Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T08:44:09.060Z"}

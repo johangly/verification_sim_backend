@@ -32,7 +32,7 @@ sequelize = new Sequelize(currentEnvConfig.database, currentEnvConfig.username, 
 
 async function loadAndAssociateModels() {
   const modelFiles = fs
-    .readdirSync(path.join(__dirname, 'models')) // Asume que los modelos están en una subcarpeta 'models'
+    .readdirSync(path.join(__dirname, '../models')) // Asume que los modelos están en una subcarpeta 'models'
     .filter(file => {
       return (
         file.indexOf('.') !== 0 &&
@@ -43,7 +43,7 @@ async function loadAndAssociateModels() {
     });
     console.log("Modelos cargados:")
   for (const file of modelFiles) {
-    const modelModule = await import(`./models/${file}`); // Importación dinámica asíncrona
+    const modelModule = await import(`../models/${file}`); // Importación dinámica asíncrona
     const modelDefinitionFunction = modelModule.default; // Accede al export default de la función del modelo
     const model = modelDefinitionFunction(sequelize, Sequelize.DataTypes); // Pasa DataTypes desde Sequelize
     db[model.name] = model;

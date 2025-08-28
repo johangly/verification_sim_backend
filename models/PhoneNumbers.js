@@ -26,5 +26,12 @@ export default (sequelize, DataTypes) => {
         timestamps: true, // Esto añade createdAt y updatedAt automáticamente
     });
 
+    PhoneNumbers.associate = function(models) {
+        PhoneNumbers.hasMany(models.Messages, { // Usando Messages como lo actualizaste
+            foreignKey: 'phoneNumberId',
+            as: 'messages'
+        });
+    };
+
     return PhoneNumbers;
 }
