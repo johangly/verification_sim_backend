@@ -1,21 +1,32 @@
-import redis from 'redis';
+// import redis from 'redis';
 import env from 'dotenv';
+import { Redis } from '@upstash/redis'
+
 env.config();
-const client = redis.createClient({
-    url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
-});
 
-client.on('error', (err) => console.log('Redis Client Error', err));
+// configuración de Redis previa
+// const client = redis.createClient({
+//     url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
+// });
 
-const connectRedis = async () => {
-    try {
-        await client.connect();
-        console.log('Conectado a Redis');
-    } catch (error) {
-        console.error('Error al conectar a Redis:', error);
-    }
-};
+// client.on('error', (err) => console.log('Redis Client Error', err));
 
-connectRedis();
+// const connectRedis = async () => {
+//     try {
+//         await client.connect();
+//         console.log('Conectado a Redis');
+//     } catch (error) {
+//         console.error('Error al conectar a Redis:', error);
+//     }
+// };
 
-export default client;
+// configuracion de redis de upstash
+
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+})
+
+// connectRedis();
+
+export default redis;

@@ -50,11 +50,17 @@ const getPhonesStatsByUpdateDateRangeUTC = async (startDateString, endDateString
         const cacheKey = `stats:${startDateString}:${endDateString}`;
 
         const cachedData = await client.get(cacheKey);
-        if (cachedData && type === 'cached') {
-            // El TTL (Time-To-Live) se establece a 6 horas (21600 segundos)
-            // Si el dato existe, significa que está dentro del TTL
+
+        if (cachedData && typeof cachedData === 'string' && cachedData.trim() !== '' && type === 'cached') {
             console.log('Usando datos de la caché');
-            return JSON.parse(cachedData);
+            try {
+                return JSON.parse(cachedData);
+            } catch (parseError) {
+                console.error('Error al parsear datos de caché como JSON:', parseError);
+                // Si el parseo falla, borra la clave de la caché para forzar un nuevo cálculo
+                await client.del(cacheKey);
+                // Y procede a recalcular
+            }
         }
 
         const startRangeUTC = new Date(Date.UTC(
