@@ -11,6 +11,6 @@ const umzug = new Umzug({
   logger: console,
 });
 
-(async () => {
-  await umzug.up();
-})();
+export default function runMigrations() {
+  umzug.up();
+}

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url'; 
 import { Sequelize } from 'sequelize'; 
 import _config from '../config/config.js'; 
+import runMigrations from '../executeMigrations.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +68,7 @@ db.Sequelize = Sequelize; // La clase Sequelize
 // Esto debe ser llamado una vez al inicio de tu aplicación (ej. en tu main.js de Electron o servidor Node.js).
 db.initialize = async () => {
   await loadAndAssociateModels();
+  runMigrations();
 };
 
 // Exporta el objeto db por defecto. Otros archivos lo importarán como:
