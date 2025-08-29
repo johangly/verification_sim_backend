@@ -68,7 +68,7 @@ db.Sequelize = Sequelize; // La clase Sequelize
 // Esto debe ser llamado una vez al inicio de tu aplicación (ej. en tu main.js de Electron o servidor Node.js).
 db.initialize = async () => {
   await loadAndAssociateModels();
-  runMigrations();
+  runMigrations(db.sequelize);
 };
 
 // Exporta el objeto db por defecto. Otros archivos lo importarán como:

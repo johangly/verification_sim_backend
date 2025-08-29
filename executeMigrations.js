@@ -1,16 +1,24 @@
 import { Umzug, SequelizeStorage } from 'umzug';
 
-import db from './database/index.js';
 
-const {sequelize} = db;
+// const umzug = new Umzug({
+//   migrations: { glob: 'migrations/*.ts' },
+//   context: sequelize.getQueryInterface(),
+//   storage: new SequelizeStorage({ sequelize }),
+//   logger: console,
+// });
 
-const umzug = new Umzug({
-  migrations: { glob: 'migrations/*.ts' },
-  context: sequelize.getQueryInterface(),
-  storage: new SequelizeStorage({ sequelize }),
-  logger: console,
-});
+export default async function runMigrations(sequelize) {
+  const umzug = new Umzug({
+    migrations: { glob: 'migrations/*.ts' },
+    context: sequelize.getQueryInterface(),
+    storage: new SequelizeStorage({ sequelize }),
+    logger: console,
+  });
 
-export default function runMigrations() {
-  umzug.up();
+  await umzug.up().then(() => {
+    console.log('Migrations completed successfully');
+  }).catch((error) => {
+    console.error('Error running migrations:', error);
+  });
 }
