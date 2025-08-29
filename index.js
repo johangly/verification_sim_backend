@@ -6,6 +6,7 @@ import logger from './utils/logger.js';
 import db from './database/index.js';
 import phoneNumbersRoutes from './routes/phoneNumbers.routes.js';
 import messagesRoutes from './routes/messages.routes.js';
+import campaignsRoutes from './routes/campaigns.routes.js';
 import estadisticasRoutes from './routes/estadisticas.routes.js';
 
 const app = express();
@@ -18,6 +19,7 @@ const API_PREFIX = process.env.API_PREFIX || '/verificationsim';
 // Endpoint para enviar mensajes
 app.use(`${API_PREFIX}/phonenumbers`, phoneNumbersRoutes);
 app.use(`${API_PREFIX}/messages`, messagesRoutes);
+app.use(`${API_PREFIX}/campaigns`, campaignsRoutes);
 app.use(`${API_PREFIX}/estadisticas`, estadisticasRoutes);
 
 app.use(express.json());

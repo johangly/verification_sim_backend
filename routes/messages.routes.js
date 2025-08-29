@@ -51,7 +51,15 @@ router.post('/', async (req, res) => {
     if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
       return res.status(400).json({ error: 'phoneNumbers debe ser un array válido' });
     }
-  
+
+    const campaign = await db.Campaigns.create({
+      sentAt: new Date(),
+      templateUsed: String(templates.verificationTemplate.id),
+      createdByUser: 1,
+    });
+
+    const campaignId = campaign.id;
+
     const results = [];
     const updatedNumbers = [];
     const t = await db.sequelize.transaction();
@@ -84,6 +92,7 @@ router.post('/', async (req, res) => {
             sentAt: new Date(),
             templateUsed: String(templates.verificationTemplate.id), // Guardamos el ID de la plantilla
             twilioSid: messageResult.sid,
+            campaignId: campaignId,
           }, { transaction: t });
   
           // Actualizar el estado del número de teléfono
@@ -129,10 +138,6 @@ router.post('/response', async (req, res) => {
     }
 
     const phoneNumber = From.replace('whatsapp:', '');
-    console.log('xxxxxxxxxxxxxxxXXXXXXXXXXXXXXXXXxxxxxxxxxxxxx');
-    console.log('req.body', req.body);
-    console.log("Respondiendo mensaje:", { phoneNumber, ButtonText, OriginalRepliedMessageSid });
-    console.log('xxxxxxxxxxxxxxxXXXXXXXXXXXXXXXXXxxxxxxxxxxxxx');
     const t = await db.sequelize.transaction();
   
     try {
@@ -166,7 +171,6 @@ router.post('/response', async (req, res) => {
   
       await t.commit();
   
-      console.log(`Respuesta de ${phoneNumber} registrada. Nuevo estado: ${newStatus}`);
       res.status(200).json({ message: 'Respuesta registrada y estado actualizado' });
   
     } catch (error) {
@@ -185,9 +189,6 @@ router.post('/status-update', async (req, res) => {
   try {
       const { To, MessageStatus, MessageSid } = req.body;
       
-      console.log('--- Webhook Entrante (Estado Mensaje Twilio) ---');
-      console.log("Datos:", { To, MessageStatus, MessageSid });
-
       const phoneNumberString = To.replace('whatsapp:', '');
 
       const phoneRecord = await db.PhoneNumbers.findOne({ 
@@ -244,22 +245,4 @@ router.post('/status-update', async (req, res) => {
   }
 });
 
-router.get('/test', async (req, res) => {
-    try {
-        const messageResult = await sendMessage(
-            whatsappNumber,
-            templates.verificationTemplate.id,
-            '',
-            `whatsapp:+584121902326`
-          );
-        console.log(messageResult)
-        return res.json(messageResult)
-    } catch (error) {
-        console.error('Error al enviar mensajes:', error);
-        res.status(500).json({
-          error: 'Error al enviar mensajes',
-          details: error.message
-        });
-      }
-})
 export default router;
