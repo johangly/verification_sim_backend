@@ -35,7 +35,7 @@ export default (sequelize, DataTypes) => {
           foreignKey: 'phoneNumberId',
           as: 'phoneNumber'
       });
-      Messages.belongsTo(models.Campaign, {
+      Messages.belongsTo(models.Campaigns, {
         foreignKey: 'campaignId',
         as: 'campaign'
     });
