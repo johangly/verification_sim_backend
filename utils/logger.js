@@ -26,12 +26,11 @@ const logger = winston.createLogger({
 
 // Añadir un manejo de excepciones global
 process.on('unhandledRejection', (error) => {
-  logger.error('Unhandled Rejection at:', error.stack);
+  logger.error('Unhandled Rejection at:', error);
 });
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
-  logger.error('Uncaught Exception:', error.stack);
 });
 
 export default logger;

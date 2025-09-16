@@ -390,3 +390,5 @@
 {"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T14:18:45.541Z"}
 {"level":"info","message":"Server is running on port 3001","timestamp":"2025-08-28T14:18:52.036Z"}
 {"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-08-28T14:18:52.053Z"}
+{"level":"info","message":"Server is running on port 3001","timestamp":"2025-09-16T21:41:28.998Z"}
+{"level":"error","message":"Unhandled Rejection at:","timestamp":"2025-09-16T21:41:29.015Z"}

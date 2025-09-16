@@ -21,6 +21,10 @@ export default (sequelize, DataTypes) => {
       twilioSid: {  // Nuevo campo
         type: DataTypes.STRING,
         allowNull: true  // Ajusta según tus necesidades
+      },
+      campaignId: {
+        type: DataTypes.INTEGER,
+        allowNull: true
       }
   }, {
       timestamps: true,
