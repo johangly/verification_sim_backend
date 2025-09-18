@@ -4,24 +4,6 @@ const router = express.Router();
 
 router.use(express.json());
 
-router.get('/bydaterange', async (req, res) => {
-    try {
-  
-      // el formato de las fechas debe ser en string y en formato UTC
-      // startRange = '2025-05-18'
-      // endRange = '2025-08-20'
-      // const { startRange, endRange } = req.query;
-  
-      const startRange = '2025-05-18'
-      const endRange = '2025-08-20'
-      const estadisticas = await getPhonesStatsByUpdateDateRangeUTC(startRange, endRange);
-      res.json(estadisticas);
-      
-    } catch (error) {
-      console.log(error)
-      res.status(500).json({ message: 'Error al obtener las estadisticas' });
-    }
-  });
 
 router.get('/', async (req, res) => {
   try {
@@ -41,6 +23,25 @@ router.get('/', async (req, res) => {
     const todayString = today.toISOString().split('T')[0];
 
     const estadisticas = await getPhonesStatsByUpdateDateRangeUTC(startDateString, todayString, type);
+    res.json(estadisticas);
+    
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: 'Error al obtener las estadisticas' });
+  }
+});
+
+router.get('/bydaterange', async (req, res) => {
+  try {
+
+    // el formato de las fechas debe ser en string y en formato UTC
+    // startRange = '2025-05-18'
+    // endRange = '2025-08-20'
+    // const { startRange, endRange } = req.query;
+
+    const startRange = '2025-05-18'
+    const endRange = '2025-08-20'
+    const estadisticas = await getPhonesStatsByUpdateDateRangeUTC(startRange, endRange);
     res.json(estadisticas);
     
   } catch (error) {
