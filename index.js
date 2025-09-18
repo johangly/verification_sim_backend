@@ -18,8 +18,8 @@ const API_PREFIX = process.env.API_PREFIX || '/verificationsim';
 
 // Endpoint para enviar mensajes
 app.use(`${API_PREFIX}/phonenumbers`, phoneNumbersRoutes);
-app.use(`${API_PREFIX}/messages`, messagesRoutes);
 app.use(`${API_PREFIX}/campaigns`, campaignsRoutes);
+app.use(`${API_PREFIX}/messages`, messagesRoutes);
 app.use(`${API_PREFIX}/estadisticas`, estadisticasRoutes);
 
 app.use(express.json());
