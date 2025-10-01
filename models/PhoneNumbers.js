@@ -1,32 +1,37 @@
 export default (sequelize, DataTypes) => {
     const PhoneNumbers = sequelize.define('PhoneNumbers', {
         id: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true,
+            type: DataTypes.INTEGER,
+            autoIncrement: true,
+            primaryKey: true,
         },
         phoneNumber: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-        validate: {
-            is: {
-            args: /^\+\d{1,3}\d{2,4}\d{3,4}\d{4}$/,
-            msg: "El número de teléfono no tiene un formato válido."
-            },
-        }
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+            validate: {
+                is: {
+                    args: /^\+\d{1,3}\d{2,4}\d{3,4}\d{4}$/,
+                    msg: "El número de teléfono no tiene un formato válido."
+                },
+            }
         },
         status: {
-        type: DataTypes.ENUM('no verificado', 'verificado', 'por verificar'),
-        defaultValue: 'por verificar',
-        allowNull: false,
+            type: DataTypes.ENUM('no verificado', 'verificado', 'por verificar'),
+            defaultValue: 'por verificar',
+            allowNull: false,
+        },
+        hasReceivedVerificationMessage: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false
         },
     }, {
         tableName: 'telefonos',
         timestamps: true, // Esto añade createdAt y updatedAt automáticamente
     });
 
-    PhoneNumbers.associate = function(models) {
+    PhoneNumbers.associate = function (models) {
         PhoneNumbers.hasMany(models.Messages, { // Usando Messages como lo actualizaste
             foreignKey: 'phoneNumberId',
             as: 'messages'
