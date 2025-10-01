@@ -73,6 +73,146 @@ router.post('/file', upload.single('file'), async (req, res) => {
 
 router.use(express.json());
 
+router.post('/create-full-campaign', async (req, res) => {
+    const { phoneNumbers } = req.body;
+
+    if (!phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+        return res.status(400).json({ error: 'No se proporcionaron números de teléfono válidos' });
+    }
+
+    const t = await db.sequelize.transaction();
+
+    try {
+        // 1. Crear la campaña
+        const campaign = await db.Campaigns.create({
+            sentAt: new Date(),
+            templateUsed: templates.verificationTemplate.id,
+            createdByUser: 1 // Ajustar según la autenticación
+        }, { transaction: t });
+
+        const results = [];
+        const batchSize = 100; // Procesar en lotes para mejor rendimiento
+
+        for (let i = 0; i < phoneNumbers.length; i += batchSize) {
+            const batch = phoneNumbers.slice(i, i + batchSize);
+            // Extraer solo los números de teléfono del batch
+            const batchPhoneNumbers = batch.map(item => item.phoneNumber);
+
+            // Buscar números que ya existen
+            const existingPhones = await db.PhoneNumbers.findAll({
+                where: {
+                    phoneNumber: batchPhoneNumbers
+                },
+                transaction: t,
+                raw: true
+            });
+            // Obtener los números que ya existen
+            const existingNumbers = new Set(existingPhones.map(p => p.phoneNumber));
+            // Filtrar números que no existen
+            const newNumbers = batch.filter(numObj => !existingNumbers.has(numObj.phoneNumber));
+            // Crear números que no existen
+            if (newNumbers.length > 0) {
+                await db.PhoneNumbers.bulkCreate(
+                    newNumbers.map(num => ({
+                        phoneNumber: num.phoneNumber,
+                        status: num.status || 'por verificar'
+                    })),
+                    { transaction: t, ignoreDuplicates: true }
+                );
+            }
+
+            // Obtener todos los números del lote (tanto los existentes como los nuevos)
+            const allPhones = await db.PhoneNumbers.findAll({
+                where: {
+                    phoneNumber: batchPhoneNumbers,
+                    hasReceivedVerificationMessage: false
+                },
+                transaction: t
+            });
+            // Crear mensajes para todos los números
+            const messages = await Promise.all(
+                allPhones.map(async (phone) => {
+                    const numeroSinEspacio = phone.phoneNumber.replace(/\s/g, "");
+
+                    const messageResult = await sendMessages({
+                        fromPhoneNumber: whatsappNumber,
+                        contentSid: templates.verificationTemplate.id,
+                        contentVariables: '',
+                        toPhoneNumber: `whatsapp:${numeroSinEspacio}`,
+                        client: client
+                    });
+
+                    try {
+                        const message = await db.Messages.create({
+                            phoneNumberId: phone.id,
+                            sentAt: new Date(),
+                            templateUsed: templates.verificationTemplate.id,
+                            twilioSid: messageResult.sid,
+                            campaignId: campaign.id,
+                        }, { transaction: t });
+
+                        if (!message) {
+                            results.push({
+                                phoneNumber: numeroSinEspacio,
+                                status: 'error',
+                                error: 'Error al crear el mensaje'
+                            });
+                            return null;
+                        }
+
+                        const updatePhone = await db.PhoneNumbers.update(
+                            {
+                                status: 'por verificar',
+                                hasReceivedVerificationMessage: true
+                            },
+                            {
+                                where: {
+                                    id: phone.id
+                                },
+                                transaction: t
+                            }
+                        );
+
+                        results.push({
+                            phoneNumber: numeroSinEspacio,
+                            status: 'success',
+                            messageId: message.id
+                        });
+
+                        return message;
+                    } catch (error) {
+                        results.push({
+                            phoneNumber: phone.phoneNumber,
+                            status: 'error',
+                            error: error.message
+                        });
+                        return null;
+                    }
+                })
+            );
+        }
+
+        await t.commit();
+
+        return res.status(201).json({
+            status: 'success',
+            campaign,
+            totalMessages: results.filter(r => r.status === 'success').length,
+            results,
+            message: 'Campaña creada exitosamente'
+        });
+
+    } catch (error) {
+        await t.rollback();
+        console.error('Error al crear la campaña:', error);
+        return res.status(500).json({
+            status: 'error',
+            error: 'Error al crear la campaña',
+            details: error.message
+        });
+    }
+});
+
 router.get('/', async (req, res) => {
     const campaigns = await db.Campaigns.findAll({
         include: [
@@ -117,134 +257,5 @@ router.get('/:id', async (req, res) => {
 });
 
 
-router.post('/create-full-campaign', async (req, res) => {
-    const { phoneNumbers } = req.body;
-
-    if (!phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
-        return res.status(400).json({ error: 'No se proporcionaron números de teléfono válidos' });
-    }
-
-    const t = await db.sequelize.transaction();
-
-    try {
-        // 1. Crear la campaña
-        const campaign = await db.Campaigns.create({
-            sentAt: new Date(),
-            templateUsed: 'template_por_defecto', // Ajustar según sea necesario
-            createdByUser: 1 // Ajustar según la autenticación
-        }, { transaction: t });
-
-        const results = [];
-        const batchSize = 100; // Procesar en lotes para mejor rendimiento
-
-        for (let i = 0; i < phoneNumbers.length; i += batchSize) {
-            const batch = phoneNumbers.slice(i, i + batchSize);
-
-            // Buscar números que ya existen
-            const existingPhones = await db.PhoneNumbers.findAll({
-                where: {
-                    phoneNumber: batch
-                },
-                transaction: t,
-                raw: true
-            });
-
-            // Obtener los números que ya existen
-            const existingNumbers = new Set(existingPhones.map(p => p.phoneNumber));
-
-            // Filtrar números que no existen
-            const newNumbers = batch.filter(num => !existingNumbers.has(num));
-
-            // Crear números que no existen
-            if (newNumbers.length > 0) {
-                await db.PhoneNumbers.bulkCreate(
-                    newNumbers.map(num => ({
-                        phoneNumber: num,
-                        status: num.status || 'por verificar'
-                    })),
-                    { transaction: t, ignoreDuplicates: true }
-                );
-            }
-
-            // Obtener todos los números del lote (tanto los existentes como los nuevos)
-            const allPhones = await db.PhoneNumbers.findAll({
-                where: {
-                    phoneNumber: batch
-                },
-                transaction: t
-            });
-
-            // Crear mensajes para todos los números
-            const messages = await Promise.all(
-                allPhones.map(async (phone) => {
-                    const numeroSinEspacio = phone.phoneNumber.replace(/\s/g, "");
-
-                    const messageResult = await sendMessages(
-                        whatsappNumber,
-                        templates.verificationTemplate.id,
-                        '',
-                        `whatsapp:${numeroSinEspacio}`
-                    );
-                    console.log('|||||||||||||||||||||||')
-                    console.log('messageResult:', messageResult)
-                    console.log('|||||||||||||||||||||||')
-
-                    try {
-                        const message = await db.Messages.create({
-                            phoneNumberId: phone.id,
-                            sentAt: new Date(),
-                            templateUsed: templates.verificationTemplate.id,
-                            twilioSid: messageResult.sid,
-                            campaignId: campaign.id,
-                        }, { transaction: t });
-
-                        if(!message) {
-                            results.push({
-                                phoneNumber: numeroSinEspacio,
-                                status: 'error',
-                                error: 'Error al crear el mensaje'
-                            });
-                            return null;
-                        }
-                        
-                        results.push({
-                            phoneNumber: numeroSinEspacio,
-                            status: 'success',
-                            messageId: message.id
-                        });
-
-                        return message;
-                    } catch (error) {
-                        results.push({
-                            phoneNumber: phone.phoneNumber,
-                            status: 'error',
-                            error: error.message
-                        });
-                        return null;
-                    }
-                })
-            );
-        }
-
-        await t.commit();
-
-        return res.status(201).json({
-            status: 'success',
-            campaign,
-            totalMessages: results.filter(r => r.status === 'success').length,
-            results,
-            message: 'Campaña creada exitosamente'
-        });
-
-    } catch (error) {
-        await t.rollback();
-        console.error('Error al crear la campaña:', error);
-        return res.status(500).json({
-            status: 'error',
-            error: 'Error al crear la campaña',
-            details: error.message
-        });
-    }
-});
 
 export default router;

@@ -71,7 +71,10 @@ router.post('/', async (req, res) => {
         
         // Buscar el número de teléfono
         const phoneRecord = await db.PhoneNumbers.findOne({
-          where: { phoneNumber },
+          where: { 
+            phoneNumber:phoneNumber,
+            hasReceivedVerificationMessage: false
+          },
           transaction: t
         });
   
@@ -97,7 +100,9 @@ router.post('/', async (req, res) => {
           }, { transaction: t });
   
           // Actualizar el estado del número de teléfono
-          await phoneRecord.update({ status: 'por verificar' }, { transaction: t });
+          await phoneRecord.update({
+            status: 'por verificar', hasReceivedVerificationMessage: true 
+          }, { transaction: t });
           
           results.push({ phoneNumber, status: 'success', messageId: messageResult.sid });
           updatedNumbers.push(phoneRecord.toJSON());
