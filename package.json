@@ -9,7 +9,7 @@
     "dev": "nodemon index.js",
     "sync": "node models/sync.js",
     "test": "jest",
-    "migrate": "node executeMigrations.js"
+    "migrate": "npx sequelize-cli db:migrate"
   },
   "dependencies": {
     "@upstash/redis": "^1.35.3",

@@ -28,7 +28,9 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
-const sendMessage = async (fromPhoneNumber, contentSid, contentVariables = '', toPhoneNumber) => {
+const client = twilio(accountSid, authToken);
+
+export const sendMessage = async (fromPhoneNumber, contentSid, contentVariables = '', toPhoneNumber) => {
     try {
         const message = await client.messages.create({
             from: fromPhoneNumber,
@@ -43,7 +45,6 @@ const sendMessage = async (fromPhoneNumber, contentSid, contentVariables = '', t
         console.error('Error al enviar el mensaje:', error);
     }
 };
-const client = twilio(accountSid, authToken);
 
 router.post('/', async (req, res) => {
     const { phoneNumbers } = req.body;

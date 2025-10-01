@@ -137,8 +137,10 @@ router.post('/', async (req, res) => {
   try {
     const { phoneNumber, status } = req.body;
 
+    const numeroSinEspacio = phoneNumber.replace(/\s/g, "");
+
     const newPhoneNumber = await db.PhoneNumbers.create({
-      phoneNumber,
+      phoneNumber: numeroSinEspacio,
       status: status || 'por verificar'
     });
     res.status(201).json(newPhoneNumber);
@@ -155,10 +157,11 @@ router.put('/:id', async (req, res) => {
     if (!phoneNumber) {
       return res.status(404).json({ message: 'Número de teléfono no encontrado' });
     }
-
     const { phoneNumber: newPhoneNumber, status } = req.body;
+    const numeroSinEspacio = newPhoneNumber.replace(/\s/g, "");
+    
     await phoneNumber.update({
-      phoneNumber: newPhoneNumber,
+      phoneNumber: numeroSinEspacio,
       status: status || phoneNumber.status
     });
     res.json(phoneNumber);
