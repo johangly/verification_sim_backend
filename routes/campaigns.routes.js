@@ -34,6 +34,9 @@ router.post('/file', upload.single('file'), async (req, res) => {
         lines.shift();
 
         const phoneNumbersToCreate = [];
+        const phoneNumbersToCheck = [];
+        
+        // Primera pasada: recolectar todos los números válidos
         for (const line of lines) {
             const [phoneNumber, statusFromFile] = line.split(',');
 
@@ -47,12 +50,45 @@ router.post('/file', upload.single('file'), async (req, res) => {
             const isValidStatus = ['verificado', 'no verificado', 'por verificar'].includes(statusToUse);
 
             if (trimmedPhoneNumber && isValidStatus) {
+                phoneNumbersToCheck.push(trimmedPhoneNumber);
                 phoneNumbersToCreate.push({
                     phoneNumber: trimmedPhoneNumber,
                     status: statusToUse
                 });
             } else {
                 logger.warn(`Línea inválida ignorada: ${line}`);
+            }
+        }
+
+        // Buscar números existentes en la base de datos
+        const existingNumbers = await db.PhoneNumbers.findAll({
+            where: {
+                phoneNumber: phoneNumbersToCheck
+            },
+            raw: true
+        });
+
+        // Mapear números existentes para búsqueda rápida
+        const existingNumbersMap = new Map();
+        existingNumbers.forEach(num => {
+            existingNumbersMap.set(num.phoneNumber, num);
+        });
+
+        // Actualizar los números que ya existen con sus datos de la base de datos
+        for (let i = 0; i < phoneNumbersToCreate.length; i++) {
+            const existingNumber = existingNumbersMap.get(phoneNumbersToCreate[i].phoneNumber);
+            if (existingNumber) {
+                // Si el número existe, usamos los datos de la base de datos
+                phoneNumbersToCreate[i] = {
+                    ...existingNumber,
+                    // Mantenemos el estado del archivo a menos que se esté forzando uno
+                    status: isValidForcedStatus ? forcedStatus : existingNumber.status,
+                    // Aseguramos que estos campos estén presentes
+                    id: existingNumber.id,
+                    createdAt: existingNumber.createdAt,
+                    updatedAt: existingNumber.updatedAt,
+                    hasReceivedVerificationMessage: existingNumber.hasReceivedVerificationMessage || false
+                };
             }
         }
 
