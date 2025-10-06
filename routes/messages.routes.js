@@ -1,7 +1,9 @@
 import express from 'express';
 import db from '../database/index.js';
 import twilio from 'twilio';
-
+import logger from '../utils/logger.js';
+import { Op } from 'sequelize';
+import getSearchablePhoneNumbers from '../utils/getSearchablePhoneNumbers.js';
 const router = express.Router();
 router.use(express.json());
 
@@ -37,6 +39,7 @@ export const sendMessage = async (fromPhoneNumber, contentSid, contentVariables 
             contentSid: contentSid,
             // contentVariables: JSON.stringify(contentVariables),
             to: toPhoneNumber,
+            contentApiLanguage: 'es',
         });
 
         console.log(`Mensaje enviado con SID: ${message.sid}`);
@@ -55,7 +58,7 @@ router.post('/', async (req, res) => {
 
     const campaign = await db.Campaigns.create({
       sentAt: new Date(),
-      templateUsed: String(templates.verificationTemplate.id),
+      templateUsed: templates.verificationTemplate.id,
       createdByUser: 1,
     });
 
@@ -84,6 +87,7 @@ router.post('/', async (req, res) => {
         }
   
         try {
+          console.log("datos para enviar el mensaje:", whatsappNumber, templates.verificationTemplate.id, '', `whatsapp:${numeroSinEspacio}`);
           const messageResult = await sendMessage(
             whatsappNumber,
             templates.verificationTemplate.id,
@@ -91,17 +95,18 @@ router.post('/', async (req, res) => {
             `whatsapp:${numeroSinEspacio}`
           );
   
-          await db.Messages.create({
+          const messageSended = await db.Messages.create({
             phoneNumberId: phoneRecord.id,
             sentAt: new Date(),
-            templateUsed: String(templates.verificationTemplate.id), // Guardamos el ID de la plantilla
+            templateUsed: templates.verificationTemplate.id,
             twilioSid: messageResult.sid,
             campaignId: campaignId,
           }, { transaction: t });
-  
+          console.log("mensaje enviado:", messageSended);
           // Actualizar el estado del número de teléfono
           await phoneRecord.update({
-            status: 'por verificar', hasReceivedVerificationMessage: true 
+            status: 'por verificar',
+            // hasReceivedVerificationMessage: true 
           }, { transaction: t });
           
           results.push({ phoneNumber, status: 'success', messageId: messageResult.sid });
@@ -135,25 +140,48 @@ router.post('/', async (req, res) => {
 
 
 router.post('/response', async (req, res) => {
+    logger.info('||||||||||||||||||||||||||||||||||||||||')
+    logger.info(`Entrando al response`);
+    logger.info('||||||||||||||||||||||||||||||||||||||||')
     const { ButtonText, From, OriginalRepliedMessageSid } = req.body;
     // si MessageType es 'text' no es un boton y si es interactive es un boton
     const { Body, MessageType } = req.body;
-
+    logger.info(`Twilio Webhook Received:{
+      body: ${Body},
+      messageType: ${MessageType},
+      buttonText: ${ButtonText},
+      originalRepliedMessageSid: ${OriginalRepliedMessageSid},
+      from: ${From}
+    }`);
+    logger.info('||||||||||||||||||||||||||||||||||||||||')
     if(MessageType === 'text'){
+      logger.error(`Respuesta no es un boton`);
+      logger.info('-------------------------------------')
       return res.status(200).json({ message: 'Respuesta no es un boton' });
     }
 
     const phoneNumber = From.replace('whatsapp:', '');
+    const numbersToSearch = getSearchablePhoneNumbers(phoneNumber);
+
+    logger.info(`Buscando número: ${phoneNumber}`);
+    logger.info(`Números a buscar: ${numbersToSearch}`);
     const t = await db.sequelize.transaction();
   
     try {
       const phoneRecord = await db.PhoneNumbers.findOne({ 
-        where: { phoneNumber },
+        where: { 
+          phoneNumber: {
+           [Op.in]: numbersToSearch 
+          } 
+        },
         transaction: t
       });
   
       if (!phoneRecord) {
         await t.rollback(); // Revertir por seguridad
+        logger.error(`Número no encontrado: ${phoneNumber}`);
+        logger.info('-------------------------------------')
+
         return res.status(404).json({ error: `Número no encontrado: ${phoneNumber}` });
       }
   
@@ -165,23 +193,37 @@ router.post('/response', async (req, res) => {
         transaction: t
       });
   
-      if (respondedMessage) {
-        await respondedMessage.update({
-          responseReceived: ButtonText,
-          respondedAt: new Date(),
-        }, { transaction: t });
+      if (!respondedMessage) {
+        await t.rollback(); // Revertir por seguridad
+        logger.error(`Mensaje no encontrado: ${OriginalRepliedMessageSid}`);
+        logger.info('-------------------------------------')
+        return res.status(404).json({ error: `Mensaje no encontrado: ${OriginalRepliedMessageSid}` });
       }
   
+      // actualiza el mensaje
+      logger.info(`Actualizando el mensaje: ${JSON.stringify(respondedMessage, null, 2)}`);
+      await respondedMessage.update({
+        responseReceived: ButtonText,
+        respondedAt: new Date(),
+      }, { transaction: t });
+
+      // actualiza el estado del cliente
       const newStatus = ButtonText === 'Si' ? 'verificado' : 'no verificado';
+      logger.info(`Actualizando el estado del cliente: ${newStatus}`);
       await phoneRecord.update({ status: newStatus }, { transaction: t });
   
       await t.commit();
   
+      logger.info('||||||||||||||||||||||||||||||||||||||||')
+      logger.info('Respuesta registrada y estado actualizado');
+      logger.info('||||||||||||||||||||||||||||||||||||||||')
       res.status(200).json({ message: 'Respuesta registrada y estado actualizado' });
   
     } catch (error) {
       await t.rollback();
-      console.error('Error al procesar la respuesta:', error);
+      logger.info('----------------------------------------')
+      logger.error(`Error al procesar la respuesta: ${error}`);
+      logger.info('----------------------------------------')
       res.status(500).json({
         error: 'Error al procesar la respuesta',
         details: error.message
@@ -191,19 +233,24 @@ router.post('/response', async (req, res) => {
 
 router.post('/status-update', async (req, res) => {
   const t = await db.sequelize.transaction(); // Inicia una transacción
-  
+  logger.info('||||||||||||||||||||||||||||||||||||||||')
+  logger.info(`Entrando al status-update`);
+  logger.info('||||||||||||||||||||||||||||||||||||||||')
   try {
       const { To, MessageStatus, MessageSid } = req.body;
       
       const phoneNumberString = To.replace('whatsapp:', '');
-
+      const numbersToSearch = getSearchablePhoneNumbers(phoneNumberString);
       const phoneRecord = await db.PhoneNumbers.findOne({ 
-          where: { phoneNumber: phoneNumberString },
+          where: { phoneNumber: { [Op.in]: numbersToSearch } },
           transaction: t
       });
 
       if (!phoneRecord) {
           await t.rollback();
+          logger.info('----------------------------------------')
+          logger.error(`Número de destino no encontrado: ${To}`);
+          logger.info('----------------------------------------')
           return res.status(404).json({ error: `Número de destino no encontrado: ${To}` });
       }
 
@@ -217,6 +264,9 @@ router.post('/status-update', async (req, res) => {
 
       if (!existingMessage) {
           await t.rollback();
+          logger.info('---------------------------------------')
+          logger.error(`Mensaje no encontrado para actualizar: ${MessageSid}`);
+          logger.info('---------------------------------------')
           return res.status(404).json({ error: 'Mensaje no encontrado para actualizar' });
       }
 
@@ -227,6 +277,9 @@ router.post('/status-update', async (req, res) => {
       const newPrecedence = STATUS_PRECEDENCE[newStatus] || 0;
 
       if (newPrecedence > currentPrecedence) {
+          logger.info('||||||||||||||||||||||||||||||||||||||||')
+          logger.info(`Actualizando el estado del mensaje: ${existingMessage.id}`);
+          logger.info('||||||||||||||||||||||||||||||||||||||||')
           await db.Messages.update(
               { messageStatus: newStatus, updatedAt: new Date() },
               { 
@@ -235,15 +288,23 @@ router.post('/status-update', async (req, res) => {
               }
           );
           await t.commit();
+          logger.info('||||||||||||||||||||||||||||||||||||||||')
+          logger.info('Estado actualizado correctamente');
+          logger.info('||||||||||||||||||||||||||||||||||||||||')
           res.status(200).json({ message: 'Estado actualizado correctamente' });
       } else {
+          logger.info('---------------------------------------')
+          logger.info('Estado no actualizado debido a precedencia');
+          logger.info('||||||||||||||||||||||||||||||||||||||||')
           await t.commit(); 
           res.status(200).json({ message: 'Estado no actualizado debido a precedencia' });
       }
 
   } catch (error) {
       await t.rollback();
-      console.error('❌ Error crítico al manejar la actualización de estado del mensaje:', error);
+      logger.info('---------------------------------------')
+      logger.error('❌ Error crítico al manejar la actualización de estado del mensaje:', error);
+      logger.info('||||||||||||||||||||||||||||||||||||||||')
       res.status(500).json({
           error: 'Error interno al actualizar el estado del mensaje',
           details: error.message
