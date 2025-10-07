@@ -125,7 +125,7 @@ router.post('/create-full-campaign', async (req, res) => {
             templateUsed: templates.verificationTemplate.id,
             createdByUser: 1 // Ajustar según la autenticación
         }, { transaction: t });
-
+        logger.info('Campaña creada con ID:', campaign.id);
         const results = [];
         const batchSize = 100; // Procesar en lotes para mejor rendimiento
 
@@ -177,7 +177,8 @@ router.post('/create-full-campaign', async (req, res) => {
                         toPhoneNumber: `whatsapp:${numeroSinEspacio}`,
                         client: client
                     });
-
+                    logger.info('Mensaje enviado con SID:', messageResult.sid);
+                    logger.info('Mensaje enviado a:', numeroSinEspacio);
                     try {
                         const message = await db.Messages.create({
                             phoneNumberId: phone.id,
@@ -186,7 +187,7 @@ router.post('/create-full-campaign', async (req, res) => {
                             twilioSid: messageResult.sid,
                             campaignId: campaign.id,
                         }, { transaction: t });
-
+                        logger.info('Mensaje creado con ID:', message.id);
                         if (!message) {
                             results.push({
                                 phoneNumber: numeroSinEspacio,

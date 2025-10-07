@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "sync": "node models/sync.js",
     "test": "jest",
     "migrate": "npx sequelize-cli db:migrate"
   },
