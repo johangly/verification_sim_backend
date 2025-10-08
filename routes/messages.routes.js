@@ -10,7 +10,7 @@ router.use(express.json());
 const templates = {
   // template de si o no, verificacion
   verificationTemplate: {
-    id: "HX35da09b6a1522c5240c35055eea40bde"
+    id: "HX75e9c39ea1a499935189e07648e8ed36"
   }
 }
 
