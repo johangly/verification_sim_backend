@@ -15,7 +15,7 @@ const getPhonesCountByDateRangeUTC = async (startDateString, endDateString) => {
             startDate.getUTCDate(),
             0, 0, 0
         ));
-        
+
         const endRangeUTC = new Date(Date.UTC(
             endDate.getUTCFullYear(),
             endDate.getUTCMonth(),
@@ -69,7 +69,7 @@ const getPhonesStatsByUpdateDateRangeUTC = async (startDateString, endDateString
             startDate.getUTCDate(),
             0, 0, 0
         ));
-            
+
         const endRangeUTC = new Date(Date.UTC(
             endDate.getUTCFullYear(),
             endDate.getUTCMonth(),
@@ -98,7 +98,7 @@ const getPhonesStatsByUpdateDateRangeUTC = async (startDateString, endDateString
         // Guardar los nuevos datos en la caché con un tiempo de vida (TTL) de 6 horas
         // 6 horas = 60 * 60 * 6 = 21600 segundos
         await client.set(cacheKey, JSON.stringify(stats), { EX: 21600 });
-        
+
         console.log('Estadísticas recalculadas y guardadas en caché.');
         return stats;
 
@@ -107,8 +107,39 @@ const getPhonesStatsByUpdateDateRangeUTC = async (startDateString, endDateString
         return {};
     }
 };
+const getPhonesByRangeOfDays= async (startDateString, endDateString) => {
+    try {
+        const startDate = new Date(startDateString);
+        const endDate = new Date(endDateString);
+
+        const startRangeUTC = new Date(Date.UTC(
+            startDate.getUTCFullYear(),
+            startDate.getUTCMonth(),
+            startDate.getUTCDate(),
+            0, 0, 0
+        ));
+        const endRangeUTC = new Date(Date.UTC(
+            endDate.getUTCFullYear(),
+            endDate.getUTCMonth(),
+            endDate.getUTCDate(),
+            23, 59, 59, 999
+        ));
+        const phones = await db.PhoneNumbers.findAll({
+            where: {
+                createdAt: {
+                    [Op.between]: [startRangeUTC, endRangeUTC]
+                }
+            }
+        });
+        return phones;
+    } catch (error) {
+        console.error('Error al obtener los teléfonos:', error);
+        return [];
+    }
+}
 
 export {
     getPhonesCountByDateRangeUTC,
-    getPhonesStatsByUpdateDateRangeUTC
+    getPhonesStatsByUpdateDateRangeUTC,
+    getPhonesByRangeOfDays
 }

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPhonesStatsByUpdateDateRangeUTC } from '../utils/estadistics.functions.js';
+import { getPhonesStatsByUpdateDateRangeUTC,getPhonesByRangeOfDays } from '../utils/estadistics.functions.js';
 const router = express.Router();
 
 router.use(express.json());
@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 
     const estadisticas = await getPhonesStatsByUpdateDateRangeUTC(startDateString, todayString, type);
     res.json(estadisticas);
-    
+
   } catch (error) {
     console.log(error)
     res.status(500).json({ message: 'Error al obtener las estadisticas' });
@@ -43,14 +43,34 @@ router.get('/bydaterange', async (req, res) => {
     const endRange = '2025-08-20'
     const estadisticas = await getPhonesStatsByUpdateDateRangeUTC(startRange, endRange);
     res.json(estadisticas);
-    
+
   } catch (error) {
     console.log(error)
     res.status(500).json({ message: 'Error al obtener las estadisticas' });
   }
 });
 
+router.get('/phonesbydaysrange/:days', async (req, res) => {
+  try {
+    const days = parseInt(req.params.days);
+    if (isNaN(days) || days <= 0) {
+      return res.status(400).json({ message: 'El parámetro days debe ser un número positivo' });
+    }
+    console.log('DIAS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ ',days)
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const startDateString = startDate.toISOString().split('T')[0];
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
 
+    const estadisticas = await getPhonesByRangeOfDays(startDateString, todayString);
+    console.log('Estadísticas por día:', estadisticas);
+    res.json(estadisticas);
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: 'Error al obtener las estadisticas' });
+  }
+})
 /*
 Salida esperada (ejemplo):
 Estadísticas por estado: {
