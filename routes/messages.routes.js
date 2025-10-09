@@ -4,6 +4,7 @@ import twilio from 'twilio';
 import logger from '../utils/logger.js';
 import { Op } from 'sequelize';
 import getSearchablePhoneNumbers from '../utils/getSearchablePhoneNumbers.js';
+import { normalizeMexicanPhoneNumber } from '../utils/phoneValidator.js';
 const router = express.Router();
 router.use(express.json());
 
@@ -70,12 +71,22 @@ router.post('/', async (req, res) => {
 
   try {
     await Promise.all(phoneNumbers.map(async (phoneNumber) => {
-      const numeroSinEspacio = phoneNumber.replace(/\s/g, "");
+      const numeroSinEspacio = normalizeMexicanPhoneNumber(phoneNumber);
 
+      // Si el número no es válido, lo omitimos
+      if (!numeroNormalizado) {
+        results.push({
+          phoneNumber,
+          status: 'error',
+          error: 'Formato de número inválido'
+        });
+        return; // Sale de esta iteración y continúa con el siguiente número
+      }
+      
       // Buscar el número de teléfono
       const phoneRecord = await db.PhoneNumbers.findOne({
         where: {
-          phoneNumber: phoneNumber,
+          phoneNumber: numeroSinEspacio,
           hasReceivedVerificationMessage: false
         },
         transaction: t
@@ -106,7 +117,7 @@ router.post('/', async (req, res) => {
         // Actualizar el estado del número de teléfono
         await phoneRecord.update({
           status: 'por verificar',
-          hasReceivedVerificationMessage: true 
+          hasReceivedVerificationMessage: true
         }, { transaction: t });
 
         results.push({ phoneNumber, status: 'success', messageId: messageResult.sid });
@@ -160,30 +171,30 @@ router.post('/response', async (req, res) => {
     return res.status(200).json({ message: 'Respuesta no es un boton' });
   }
 
-  const phoneNumber = From.replace('whatsapp:', '');
-  const numbersToSearch = getSearchablePhoneNumbers(phoneNumber);
+  // const phoneNumber = From.replace('whatsapp:', '');
+  // const numbersToSearch = getSearchablePhoneNumbers(phoneNumber);
 
-  logger.info(`Buscando número: ${phoneNumber}`);
-  logger.info(`Números a buscar: ${numbersToSearch}`);
+  // logger.info(`Buscando número: ${phoneNumber}`);
+  // logger.info(`Números a buscar: ${numbersToSearch}`);
   const t = await db.sequelize.transaction();
 
   try {
-    const phoneRecord = await db.PhoneNumbers.findOne({
-      where: {
-        phoneNumber: {
-          [Op.in]: numbersToSearch
-        }
-      },
-      transaction: t
-    });
+    // const phoneRecord = await db.PhoneNumbers.findOne({
+    //   where: {
+    //     phoneNumber: {
+    //       [Op.in]: numbersToSearch
+    //     }
+    //   },
+    //   transaction: t
+    // });
 
-    if (!phoneRecord) {
-      await t.rollback(); // Revertir por seguridad
-      logger.error(`Número no encontrado: ${phoneNumber}`);
-      logger.info('-------------------------------------')
+    // if (!phoneRecord) {
+    //   await t.rollback(); // Revertir por seguridad
+    //   logger.error(`Número no encontrado: ${phoneNumber}`);
+    //   logger.info('-------------------------------------')
 
-      return res.status(404).json({ error: `Número no encontrado: ${phoneNumber}` });
-    }
+    //   return res.status(404).json({ error: `Número no encontrado: ${phoneNumber}` });
+    // }
 
     const respondedMessage = await db.Messages.findOne({
       where: {
@@ -208,16 +219,16 @@ router.post('/response', async (req, res) => {
     }, { transaction: t });
 
     // actualiza el estado del cliente
-    const newStatus = ButtonText === 'Si' ? 'verificado' : 'no verificado';
-    logger.info(`Actualizando el estado del cliente: ${newStatus}`);
-    await phoneRecord.update({ status: newStatus }, { transaction: t });
+    // const newStatus = ButtonText === 'Si' ? 'verificado' : 'no verificado';
+    // logger.info(`Actualizando el estado del cliente: ${newStatus}`);
+    // await phoneRecord.update({ status: newStatus }, { transaction: t });
 
     await t.commit();
 
     logger.info('||||||||||||||||||||||||||||||||||||||||')
-    logger.info('Respuesta registrada y estado actualizado');
+    logger.info('Respuesta registrada');
     logger.info('||||||||||||||||||||||||||||||||||||||||')
-    res.status(200).json({ message: 'Respuesta registrada y estado actualizado' });
+    res.status(200).json({ message: 'Respuesta registrada' });
 
   } catch (error) {
     await t.rollback();
@@ -238,69 +249,69 @@ router.post('/response', async (req, res) => {
  */
 router.post('/fallback', async (req, res) => {
   logger.info('||||||||||||||||||||||||||||||||||||||||')
-  logger.info('      Entrando al manejador de fallback');
+  logger.info('      Entrando al manejador de fallback        ');
   logger.info('Body recibido:', JSON.stringify(req.body, null, 2));
   logger.info('||||||||||||||||||||||||||||||||||||||||')
 
-  const { MessageSid, ErrorCode, ErrorMessage, MessageStatus } = req.body;
-  const t = await db.sequelize.transaction();
+  // const { MessageSid, ErrorCode, ErrorMessage, MessageStatus } = req.body;
+  // const t = await db.sequelize.transaction();
 
-  try {
-    if (!MessageSid) {
-      logger.error('Falta el parámetro requerido: MessageSid');
-      return res.status(400).json({ error: 'Falta el parámetro requerido: MessageSid' });
-    }
+  // try {
+  //   if (!MessageSid) {
+  //     logger.error('Falta el parámetro requerido: MessageSid');
+  //     return res.status(400).json({ error: 'Falta el parámetro requerido: MessageSid' });
+  //   }
 
-    // Buscar el mensaje en la base de datos
-    const message = await db.Messages.findOne({
-      where: { twilioSid: MessageSid },
-      transaction: t,
-      include: [{
-        model: db.PhoneNumbers,
-        as: 'phoneNumber',
-        required: true
-      }]
-    });
+  //   // Buscar el mensaje en la base de datos
+  //   const message = await db.Messages.findOne({
+  //     where: { twilioSid: MessageSid },
+  //     transaction: t,
+  //     include: [{
+  //       model: db.PhoneNumbers,
+  //       as: 'phoneNumber',
+  //       required: true
+  //     }]
+  //   });
 
-    if (!message) {
-      logger.error(`Mensaje no encontrado para el SID: ${MessageSid}`);
-      await t.rollback();
-      return res.status(404).json({ error: 'Mensaje no encontrado' });
-    }
+  //   if (!message) {
+  //     logger.error(`Mensaje no encontrado para el SID: ${MessageSid}`);
+  //     await t.rollback();
+  //     return res.status(404).json({ error: 'Mensaje no encontrado' });
+  //   }
 
-    // Actualizar el estado del mensaje
-    await message.update({
-      messageStatus: MessageStatus || 'failed',
-      errorCode: ErrorCode || null,
-      errorMessage: ErrorMessage || null,
-      updatedAt: new Date()
-    }, { transaction: t });
+  //   // Actualizar el estado del mensaje
+  //   await message.update({
+  //     messageStatus: MessageStatus || 'failed',
+  //     errorCode: ErrorCode || null,
+  //     errorMessage: ErrorMessage || null,
+  //     updatedAt: new Date()
+  //   }, { transaction: t });
 
-    // Si hay un error y es un error de número inválido, marcar el número como inválido
-    if (ErrorCode && [21211, 21612, 21614].includes(parseInt(ErrorCode))) {
-      await message.phoneNumber.update({
-        status: 'invalido',
-        updatedAt: new Date()
-      }, { transaction: t });
-      logger.info(`Número marcado como inválido: ${message.phoneNumber.phoneNumber}`);
-    }
+  //   // Si hay un error y es un error de número inválido, marcar el número como inválido
+  //   if (ErrorCode && [21211, 21612, 21614].includes(parseInt(ErrorCode))) {
+  //     await message.phoneNumber.update({
+  //       status: 'invalido',
+  //       updatedAt: new Date()
+  //     }, { transaction: t });
+  //     logger.info(`Número marcado como inválido: ${message.phoneNumber.phoneNumber}`);
+  //   }
 
-    await t.commit();
-    logger.info(`Fallback procesado correctamente para el mensaje: ${MessageSid}`);
-    return res.sendStatus(200);
+  //   await t.commit();
+  //   logger.info(`Fallback procesado correctamente para el mensaje: ${MessageSid}`);
+  //   return res.sendStatus(200);
 
-  } catch (error) {
-    await t.rollback();
-    logger.error('Error al procesar el fallback:', error);
-    return res.status(500).json({
-      error: 'Error al procesar el fallback',
-      details: error.message
-    });
-  } finally {
-    logger.info('----------------------------------------')
-    logger.info('Finalizado el procesamiento del fallback');
-    logger.info('----------------------------------------')
-  }
+  // } catch (error) {
+  //   await t.rollback();
+  //   logger.error('Error al procesar el fallback:', error);
+  //   return res.status(500).json({
+  //     error: 'Error al procesar el fallback',
+  //     details: error.message
+  //   });
+  // } finally {
+  //   logger.info('----------------------------------------')
+  //   logger.info('Finalizado el procesamiento del fallback');
+  //   logger.info('----------------------------------------')
+  // }
 });
 
 router.post('/status-update', async (req, res) => {
@@ -312,6 +323,19 @@ router.post('/status-update', async (req, res) => {
 
   try {
     const { To, MessageStatus, MessageSid } = req.body;
+
+    if (!To || !MessageStatus || !MessageSid) {
+      logger.info('--------------------------------------');
+      logger.info('Faltan parámetros requeridos');
+      logger.info('To: ', To);
+      logger.info('MessageStatus: ', MessageStatus);
+      logger.info('MessageSid: ', MessageSid);
+      logger.info('--------------------------------------');
+
+      await t.rollback();
+      return res.status(400).json({ error: 'Faltan parámetros requeridos' });
+    }
+
     const MAX_RETRIES = 5;
     let messageRecord = null;
 
@@ -343,14 +367,14 @@ router.post('/status-update', async (req, res) => {
         if (i === MAX_RETRIES - 1) {
           await t.rollback();
           return res.sendStatus(500);
-        } else{
+        } else {
           await t.rollback();
           return res.sendStatus(404);
         }
       }
     }
 
-    if(messageRecord){
+    if (messageRecord) {
       // Actualización del estado
       const currentStatus = messageRecord.messageStatus;
       const newStatus = MessageStatus;
@@ -358,20 +382,63 @@ router.post('/status-update', async (req, res) => {
       const newPrecedence = STATUS_PRECEDENCE[newStatus] || 0;
 
       if (newPrecedence > currentPrecedence) {
+        // actualiza el estado del mensaje
         await messageRecord.update(
-          { 
+          {
             messageStatus: newStatus,
-            updatedAt: new Date() 
-          }, 
+            updatedAt: new Date()
+          },
           { transaction: t }
         );
-        
+
+        logger.info('||||||||||||||||||||||||||||||||||||||||')
+        logger.info(`✅ Estado del mensaje actualizado a ${newStatus}`);
+        logger.info('||||||||||||||||||||||||||||||||||||||||')
+        // si el nuevo estado es entregado o leido, actualiza el estado del numero de telefono
+        if (newStatus === 'delivered' || newStatus === 'read') {
+
+          const phoneNumberString = To.replace('whatsapp:', '');
+          const numbersToSearch = getSearchablePhoneNumbers(phoneNumberString);
+          logger.info('numbersToSearch: ', numbersToSearch);
+          // busca el numero de telefono
+          const phoneRecord = await db.PhoneNumbers.findOne({
+            where: {
+              phoneNumber: { [Op.in]: numbersToSearch },
+              [Op.or]: [
+                { status: 'por verificar' },
+                { status: 'no verificado' }
+              ]
+            },
+            transaction: t
+          });
+
+          if (!phoneRecord) {
+            logger.info('----------------------------------------')
+            logger.error(`Número de destino no encontrado o su estado ya es verificado: ${To}`);
+            logger.info('----------------------------------------')
+          } else {
+            logger.info('phoneRecord: ', phoneRecord.phoneNumber);
+            logger.info('newStatus: ', newStatus);
+            // actualiza el estado del numero de telefono
+            await phoneRecord.update({
+              status: 'verificado',
+              updatedAt: new Date()
+            }, { transaction: t });
+
+            logger.info('||||||||||||||||||||||||||||||||||||||||')
+            logger.info(`✅ Número de destino actualizado a verificado: ${To}`);
+            logger.info('||||||||||||||||||||||||||||||||||||||||')
+          }
+        }
+
         await t.commit();
-        logger.info(`Estado actualizado a: ${newStatus}`);
+        logger.info(`✅ Estado actualizado a: ${newStatus}`);
         return res.sendStatus(200);
       } else {
         await t.rollback();
-        logger.info('Estado no actualizado: precedencia menor o igual');
+        logger.info('||||||||||||||||||||||||||||||||||||||||')
+        logger.info(`Estado no actualizado: precedencia menor o igual`);
+        logger.info('||||||||||||||||||||||||||||||||||||||||')
         return res.sendStatus(200);
       }
     } else {

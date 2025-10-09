@@ -2,6 +2,8 @@ import express from 'express';
 import db from '../database/index.js';
 import multer from 'multer';
 import { Op } from 'sequelize';
+import { normalizeMexicanPhoneNumber } from '../utils/phoneValidator.js';
+import logger from '../utils/logger.js';
 // Configura Multer para guardar el archivo en memoria.
 // Esto es ideal para archivos pequeños como el que describes.
 const upload = multer({ storage: multer.memoryStorage(), dest: '../uploads/' });
@@ -30,7 +32,12 @@ router.post('/file', upload.single('file'), async (req, res) => {
           const [phoneNumber, statusFromFile] = line.split(',');
           
           // Validar el número de teléfono
-          const trimmedPhoneNumber = phoneNumber?.trim();
+          const trimmedPhoneNumber = normalizeMexicanPhoneNumber(phoneNumber);
+
+          if (!trimmedPhoneNumber) {
+            console.warn(`Número inválido ignorado: ${phoneNumber}`);
+            continue;
+          }
           
           // Si hay un estado forzado, lo usamos, de lo contrario usamos el del archivo
           const statusToUse = isValidForcedStatus ? forcedStatus : statusFromFile?.trim();
@@ -38,7 +45,7 @@ router.post('/file', upload.single('file'), async (req, res) => {
           // Verificamos que los datos sean válidos según el modelo
           const isValidStatus = ['verificado', 'no verificado', 'por verificar'].includes(statusToUse);
 
-          if (trimmedPhoneNumber && isValidStatus) {
+          if (isValidStatus) {
             console.log('Línea válida:', line);
               phoneNumbersToCreate.push({
                   phoneNumber: trimmedPhoneNumber,
@@ -137,7 +144,12 @@ router.post('/', async (req, res) => {
   try {
     const { phoneNumber, status } = req.body;
 
-    const numeroSinEspacio = phoneNumber.replace(/\s/g, "");
+    const numeroSinEspacio = normalizeMexicanPhoneNumber(phoneNumber);
+
+    if (!numeroSinEspacio) {
+      logger.error(`Número inválido ignorado: ${phoneNumber}`);
+      return res.status(400).json({ message: 'Número de teléfono inválido' });
+    }
 
     const newPhoneNumber = await db.PhoneNumbers.create({
       phoneNumber: numeroSinEspacio,
@@ -158,7 +170,12 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Número de teléfono no encontrado' });
     }
     const { phoneNumber: newPhoneNumber, status } = req.body;
-    const numeroSinEspacio = newPhoneNumber.replace(/\s/g, "");
+    const numeroSinEspacio = normalizeMexicanPhoneNumber(newPhoneNumber);
+    
+    if (!numeroSinEspacio) {
+      logger.error(`Número inválido ignorado: ${newPhoneNumber}`);
+      return res.status(400).json({ message: 'Número de teléfono inválido' });
+    }
     
     await phoneNumber.update({
       phoneNumber: numeroSinEspacio,
