@@ -24,6 +24,9 @@ export function validatePhoneNumber(phoneNumber) {
  * @param {string} phoneNumber - Número de teléfono a validar
  * @returns {string} Número de teléfono normalizado
  */
+
+const NUMBER_PREFIX = process.env.NUMBER_PREFIX
+
 export function normalizeMexicanPhoneNumber(phoneNumber) {
   if (!phoneNumber || typeof phoneNumber !== 'string') {
       logger.error('El número de teléfono debe ser una cadena de texto');
@@ -34,21 +37,21 @@ export function normalizeMexicanPhoneNumber(phoneNumber) {
   const cleanNumber = phoneNumber.replace(/\s/g, '');
 
   // 2. Verificar si ya tiene el prefijo +52 o +521
-  const hasPlus52 = cleanNumber.startsWith('+52');
-  const hasPlus521 = cleanNumber.startsWith('+521');
+  const hasPlusPrefix = cleanNumber.startsWith(`+${NUMBER_PREFIX}`);
+  const hasPlusPrefix1 = cleanNumber.startsWith(`+${NUMBER_PREFIX}1`);
   
   // 3. Validar la longitud según el prefijo
-  if (hasPlus521) {
+  if (hasPlusPrefix1) {
       // +521 + 10 dígitos = 14 caracteres
       if (cleanNumber.length !== 14 || cleanNumber.length !== 13) {
-          logger.error('Número con formato +521 debe tener 14 dígitos en total');
+          logger.error(`Número con formato +${NUMBER_PREFIX}1 debe tener 14 dígitos en total`);
           return null;
       }
       return cleanNumber;
-  } else if (hasPlus52) {
+  } else if (hasPlusPrefix) {
       // +52 + 10 dígitos = 13 caracteres
       if (cleanNumber.length !== 13) {
-          logger.error('Número con formato +52 debe tener 13 dígitos en total');
+          logger.error(`Número con formato +${NUMBER_PREFIX} debe tener 13 dígitos en total`);
           return null;
       }
       return cleanNumber;
@@ -60,15 +63,15 @@ export function normalizeMexicanPhoneNumber(phoneNumber) {
       // Verificar longitud
       if (digitsOnly.length === 10) {
           // Número local de 10 dígitos, agregar +52
-          return `+52${digitsOnly}`;
-      } else if (digitsOnly.length === 12 && digitsOnly.startsWith('52')) {
+          return `+${NUMBER_PREFIX}${digitsOnly}`;
+      } else if (digitsOnly.length === 12 && digitsOnly.startsWith(`${NUMBER_PREFIX}`)) {
           // Número con 52 pero sin el +
-          return `+${digitsOnly}`;
-      } else if (digitsOnly.length === 13 && digitsOnly.startsWith('521')) {
+          return `+${NUMBER_PREFIX}${digitsOnly}`;
+      } else if (digitsOnly.length === 13 && digitsOnly.startsWith(`${NUMBER_PREFIX}1`)) {
           // Número con 521 pero sin el +
-          return `+${digitsOnly}`;
+          return `+${NUMBER_PREFIX}${digitsOnly}`;
       } else {
-          logger.error(`Formato de número inválido: ${phoneNumber}. Se espera un número de 10 dígitos (local) o con prefijo +52/+521`);
+          logger.error(`Formato de número inválido: ${phoneNumber}. Se espera un número de 10 dígitos (local) o con prefijo +${NUMBER_PREFIX}/+${NUMBER_PREFIX}1`);
           return null;
       }
   }

@@ -7,13 +7,7 @@ import getSearchablePhoneNumbers from '../utils/getSearchablePhoneNumbers.js';
 import { normalizeMexicanPhoneNumber } from '../utils/phoneValidator.js';
 const router = express.Router();
 router.use(express.json());
-
-const templates = {
-  // template de si o no, verificacion
-  verificationTemplate: {
-    id: "HX75e9c39ea1a499935189e07648e8ed36"
-  }
-}
+import { templates } from '../utils/messageTemplates.js';
 
 const STATUS_PRECEDENCE = {
   'queued': 0,    // Mensaje en cola en Twilio

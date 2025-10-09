@@ -56,7 +56,7 @@ router.get('/phonesbydaysrange/:days', async (req, res) => {
     if (isNaN(days) || days <= 0) {
       return res.status(400).json({ message: 'El parámetro days debe ser un número positivo' });
     }
-    console.log('DIAS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ ',days)
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const startDateString = startDate.toISOString().split('T')[0];
@@ -64,7 +64,6 @@ router.get('/phonesbydaysrange/:days', async (req, res) => {
     const todayString = today.toISOString().split('T')[0];
 
     const estadisticas = await getPhonesByRangeOfDays(startDateString, todayString);
-    console.log('Estadísticas por día:', estadisticas);
     res.json(estadisticas);
   } catch (error) {
     console.log(error)
