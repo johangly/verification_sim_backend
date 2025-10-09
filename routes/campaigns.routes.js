@@ -13,7 +13,8 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
 const client = twilio(accountSid, authToken);
-
+const BATCH_SIZE = process.env.CAMPAIGN_BATCH_SIZE || 100;
+const MAX_RETRIES = process.env.MAX_MESSAGE_RETRIES || 3;
 const router = express.Router();
 
 router.post('/file', upload.single('file'), async (req, res) => {
@@ -119,11 +120,25 @@ router.post('/create-full-campaign', async (req, res) => {
     const { phoneNumbers } = req.body;
 
     if (!phoneNumbers.every(p => p.phoneNumber && typeof p.phoneNumber === 'string')) {
+        logger.info('Formato de números de teléfono inválido 1');
         return res.status(400).json({ error: 'Formato de números de teléfono inválido' });
     }
 
     if (!phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+        logger.info('Formato de números de teléfono inválido 2');
         return res.status(400).json({ error: 'No se proporcionaron números de teléfono válidos' });
+    }
+
+    if (!templates.verificationTemplate) {
+        logger.info('Plantilla de verificación no configurada');
+        return res.status(500).json({ error: 'Plantilla de verificación no configurada' });
+    }
+
+    const invalidNumbers = phoneNumbers
+    .filter(p => !normalizeMexicanPhoneNumber(p.phoneNumber) || p.status === 'verificado')
+    .map(p => p.phoneNumber);
+    if (invalidNumbers.length > 0) {
+        logger.warn(`Números inválidos detectados: ${invalidNumbers.join(', ')}`);
     }
 
     const t = await db.sequelize.transaction();
@@ -136,11 +151,14 @@ router.post('/create-full-campaign', async (req, res) => {
             createdByUser: 1 // Ajustar según la autenticación
         }, { transaction: t });
         logger.info('Campaña creada con ID:', campaign.id);
+
         const results = [];
-        const batchSize = 100; // Procesar en lotes para mejor rendimiento
+        const batchSize = BATCH_SIZE; // Procesar en lotes para mejor rendimiento
 
         for (let i = 0; i < phoneNumbers.length; i += batchSize) {
+            const startTime = Date.now();
             const batch = phoneNumbers.slice(i, i + batchSize);
+
             // Normalizar y validar los números del lote
             const validatedBatch = batch
                 .map(item => {
@@ -153,58 +171,70 @@ router.post('/create-full-campaign', async (req, res) => {
                 continue; // Si no hay números válidos en el lote, pasamos al siguiente
             }
 
+            await db.PhoneNumbers.bulkCreate(
+                validatedBatch.map(num => ({
+                    phoneNumber: num.phoneNumber,
+                    status: 'por verificar'
+                })),
+                {
+                    updateOnDuplicate: ['status', 'updatedAt'],
+                    transaction: t
+                }
+            );
+
             const batchPhoneNumbers = validatedBatch.map(item => item.phoneNumber);
             // Buscar números que ya existen
-            const existingPhones = await db.PhoneNumbers.findAll({
-                where: {
-                    phoneNumber: batchPhoneNumbers
-                },
-                transaction: t,
-                raw: true
-            });
+            // const existingPhones = await db.PhoneNumbers.findAll({
+            //     where: {
+            //         phoneNumber: batchPhoneNumbers
+            //     },
+            //     transaction: t,
+            //     raw: true
+            // });
             // Filtrar números que ya existen
-            const existingNumbers = new Set(existingPhones.map(p => p.phoneNumber));
-            const newNumbers = validatedBatch.filter(numObj => !existingNumbers.has(numObj.phoneNumber));
+            // const existingNumbers = new Set(existingPhones.map(p => p.phoneNumber));
+            // const newNumbers = validatedBatch.filter(numObj => !existingNumbers.has(numObj.phoneNumber));
 
             // Crear números que no existen
-            if (newNumbers.length > 0) {
-                await db.PhoneNumbers.bulkCreate(
-                    newNumbers.map(num => ({
-                        phoneNumber: num.phoneNumber,
-                        status: 'por verificar'
-                    })),
-                    { transaction: t, ignoreDuplicates: true }
-                );
-            }
+            // if (newNumbers.length > 0) {
+            //     await db.PhoneNumbers.bulkCreate(
+            //         newNumbers.map(num => ({
+            //             phoneNumber: num.phoneNumber,
+            //             status: 'por verificar'
+            //         })),
+            //         { transaction: t, ignoreDuplicates: true }
+            //     );
+            // }
 
             // Actualizar solo los números existentes a "por verificar"
-            if (existingPhones.length > 0) {
-                await db.PhoneNumbers.update(
-                    {
-                        status: 'por verificar',
-                        updatedAt: new Date()
-                    },
-                    {
-                        where: {
-                            phoneNumber: existingPhones.map(p => p.phoneNumber)
-                        },
-                        transaction: t
-                    }
-                );
-            }
+            // if (existingPhones.length > 0) {
+            //     await db.PhoneNumbers.update(
+            //         {
+            //             status: 'por verificar',
+            //             updatedAt: new Date()
+            //         },
+            //         {
+            //             where: {
+            //                 phoneNumber: existingPhones.map(p => p.phoneNumber)
+            //             },
+            //             transaction: t
+            //         }
+            //     );
+            // }
 
             // 3. Obtener TODOS los números (nuevos + actualizados) que no han recibido mensaje
             const allPhones = await db.PhoneNumbers.findAll({
                 where: {
                     phoneNumber: batchPhoneNumbers,
-                    hasReceivedVerificationMessage: false
+                    hasReceivedVerificationMessage: false,
+                    [Op.or]: { status: 'por verificar' }
                 },
                 transaction: t
             });
 
             if (allPhones.length > 0) {
                 // Crear mensajes para todos los números
-                const messages = await Promise.all(
+                await Promise.all(
                     allPhones.map(async (phone) => {
                         const numeroSinEspacio = phone.phoneNumber.replace(/\s/g, "");
 
@@ -215,8 +245,10 @@ router.post('/create-full-campaign', async (req, res) => {
                             toPhoneNumber: `whatsapp:${numeroSinEspacio}`,
                             client: client
                         });
-                        logger.info('Mensaje enviado con SID:', messageResult.sid);
-                        logger.info('Mensaje enviado a:', numeroSinEspacio);
+                        logger.info(`Informacion del mensaje enviado: ${JSON.stringify(messageResult, null, 2)}`)
+
+                        logger.info(`Mensaje enviado con SID: ${messageResult.sid}`);
+                        logger.info(`Mensaje enviado a: ${numeroSinEspacio}`);
                         try {
                             const message = await db.Messages.create({
                                 phoneNumberId: phone.id,
@@ -225,7 +257,7 @@ router.post('/create-full-campaign', async (req, res) => {
                                 twilioSid: messageResult.sid,
                                 campaignId: campaign.id,
                             }, { transaction: t });
-                            logger.info('Mensaje creado con ID:', message.id);
+                            logger.info(`Mensaje creado con ID: ${message.id}`);
                             if (!message) {
                                 results.push({
                                     phoneNumber: numeroSinEspacio,
@@ -237,7 +269,7 @@ router.post('/create-full-campaign', async (req, res) => {
 
                             const updatePhone = await db.PhoneNumbers.update(
                                 {
-                                    status: 'por verificar',
+                                    // status: 'por verificar',
                                     hasReceivedVerificationMessage: true
                                 },
                                 {
@@ -266,24 +298,29 @@ router.post('/create-full-campaign', async (req, res) => {
                     })
                 );
             }
+            logger.info(`Procesado lote de ${batch.length} números en ${((Date.now() - startTime) / 1000).toFixed(2)} segundos`);
         }
 
         await t.commit();
 
-        return res.status(201).json({
-            status: 'success',
-            campaign,
-            totalMessages: results.filter(r => r.status === 'success').length,
-            results,
-            message: 'Campaña creada exitosamente'
+        return res.status(200).json({
+            success: true,
+            message: 'Campaña creada exitosamente',
+            campaignId: campaign.id,
+            stats: {
+                total: results.length,
+                success: results.filter(r => r.status === 'success').length,
+                errors: results.filter(r => r.status === 'error').length
+            },
+            results
         });
 
     } catch (error) {
         await t.rollback();
         console.error('Error al crear la campaña:', error);
         return res.status(500).json({
-            status: 'error',
-            error: 'Error al crear la campaña',
+            success: false,
+            message: 'Error al crear la campaña',
             details: error.message
         });
     }

@@ -40,7 +40,7 @@ export function normalizeMexicanPhoneNumber(phoneNumber) {
   // 3. Validar la longitud según el prefijo
   if (hasPlus521) {
       // +521 + 10 dígitos = 14 caracteres
-      if (cleanNumber.length !== 14) {
+      if (cleanNumber.length !== 14 || cleanNumber.length !== 13) {
           logger.error('Número con formato +521 debe tener 14 dígitos en total');
           return null;
       }
