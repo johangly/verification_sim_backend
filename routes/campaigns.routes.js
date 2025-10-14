@@ -209,7 +209,7 @@ router.post('/create-full-campaign', async (req, res) => {
             const startTime = Date.now();
             const batch = validPhoneNumbers.slice(i, i + batchSize);
 
-            const batchPhoneNumbers = batch.map(item => item.phoneNumber);
+            // const batchPhoneNumbers = batch.map(item => item.phoneNumber);
             // Buscar números que ya existen
             // const existingPhones = await db.PhoneNumbers.findAll({
             //     where: {
@@ -259,11 +259,11 @@ router.post('/create-full-campaign', async (req, res) => {
             //     transaction: t
             // });
 
-            if (batchPhoneNumbers.length > 0) {
+            if (batch.length > 0) {
                 // Crear mensajes para todos los números
                 await Promise.all(
-                    batchPhoneNumbers.map(async (phone) => {
-                        const numeroSinEspacio = phone.replace(/\s/g, "");
+                    batch.map(async (phone) => {
+                        const numeroSinEspacio = phone.phoneNumber.replace(/\s/g, "");
 
                         const messageResult = await sendMessages({
                             fromPhoneNumber: whatsappNumber,
