@@ -359,6 +359,63 @@ router.post('/create-full-campaign', async (req, res) => {
     }
 });
 
+router.get('/export', async (req, res) => {
+    try {
+        const { campaignId } = req.query;
+        
+        if (!campaignId) {
+            return res.status(400).send('Se requiere el ID de la campaña');
+        }
+
+        const campaign = await db.Campaigns.findOne({
+            where: { id: campaignId },
+            include: [
+                {
+                    model: db.Messages,
+                    as: 'messages',
+                    attributes: { exclude: ['twilioSid', 'phoneNumberId', 'createdAt'] },
+                    include: [
+                        {
+                            model: db.PhoneNumbers,
+                            as: 'phoneNumber',
+                            attributes: ['id', 'phoneNumber', 'status', 'hasReceivedVerificationMessage', 'updatedAt'],
+                        },
+                    ],
+                },
+            ],
+        });
+
+        if (!campaign) {
+            return res.status(404).send('Campaña no encontrada');
+        }
+
+        // Crear el contenido CSV
+        let csvContent = 'Teléfono,Estado\n';
+        
+        campaign.messages.forEach(message => {
+            if (message.phoneNumber) {
+                const phoneNumber = message.phoneNumber.phoneNumber || '';
+                const status = message.phoneNumber.status || 'por verificar';
+                csvContent += `"${phoneNumber}","${status}"\n`;
+            }
+        });
+
+        // Configurar los headers para la descarga
+        const date = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `campaña-${campaignId}-${date}.csv`;
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        
+        // Enviar el archivo
+        res.send(csvContent);
+        
+    } catch (error) {
+        console.error('Error al exportar la campaña:', error);
+        res.status(500).send('Error al exportar la campaña');
+    }
+});
+
 router.get('/', async (req, res) => {
     const campaigns = await db.Campaigns.findAll({
         include: [
