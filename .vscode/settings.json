@@ -1,0 +1,33 @@
+{
+	// === CONFIGURACIÓN DE FORMATO ===
+
+	// 1. Define Prettier como el formateador predeterminado para todos los lenguajes.
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+
+	// 2. Habilita el formato automático al guardar.
+	"editor.formatOnSave": true,
+	"editor.formatOnPaste": true,
+	"editor.formatOnType": true,
+
+	// 3. Deshabilita la capacidad de formato de ESLint (debe ser FALSE para evitar conflictos).
+	"eslint.format.enable": false,
+
+	// === ANULACIONES ESPECÍFICAS DE LENGUAJE (Aseguran que Prettier siempre gane) ===
+
+	"[javascript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[javascriptreact]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[typescriptreact]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+
+	// === FORMATO DE NOTEBOOKS ===
+	"notebook.defaultFormatter": "esbenp.prettier-vscode",
+	"notebook.formatOnSave.enabled": true
+}

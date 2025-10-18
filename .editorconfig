@@ -1,0 +1,11 @@
+# Archivo .editorconfig (Ejemplo usando tabs)
+root = true
+
+[*] # Aplica a todos los archivos
+charset = utf-8
+end_of_line = lf  # ¡MUY IMPORTANTE! Fuerza saltos de línea Unix (LF)
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = tab  # ⭐ CAMBIO CLAVE: Usar tabuladores
+indent_size = 8       # OPCIONAL: Especifica el ancho de visualización del tabulador
+tab_width = 8       # OPCIONAL: Especifica el ancho de visualización del tabulador
