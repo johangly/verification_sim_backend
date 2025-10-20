@@ -128,12 +128,9 @@ router.post("/file", upload.single("file"), async (req, res) => {
 			logger.info(
 				`Se obtuvieron ${phoneNumbersToCreate.length} clientes del archivo.`
 			);
-			return res
-				.status(200)
-				.json({
-					phoneNumbersToCreate:
-						phoneNumbersToCreate,
-				});
+			return res.status(200).json({
+				phoneNumbersToCreate: phoneNumbersToCreate,
+			});
 		} else {
 			logger.warn(
 				"El archivo CSV no contiene datos válidos."
@@ -155,100 +152,80 @@ router.use(express.json());
 router.post("/create-full-campaign", async (req, res) => {
 	const { phoneNumbers } = req.body;
 
-	if (
-		!phoneNumbers.every(
-			(p) =>
-				p.phoneNumber &&
-				typeof p.phoneNumber === "string"
-		)
-	) {
-		logger.info("Formato de números de teléfono inválido 1");
-		return res
-			.status(400)
-			.json({
-				error: "Formato de números de teléfono inválido",
-			});
+    if (!phoneNumbers.every(p => p.phoneNumber && typeof p.phoneNumber === "string")) {
+        logger.info("Formato de números de teléfono inválido");
+		return res.status(400).json({
+			error: "Formato de números de teléfono inválido",
+		});
 	}
 
-	if (
-		!phoneNumbers ||
-		!Array.isArray(phoneNumbers) ||
-		phoneNumbers.length === 0
-	) {
-		logger.info("Formato de números de teléfono inválido 2");
-		return res
-			.status(400)
-			.json({
-				error: "No se proporcionaron números de teléfono válidos",
-			});
+    if (!phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+        logger.info("No se proporcionaron números de teléfono");
+		return res.status(400).json({
+			error: "No se proporcionaron números de teléfono válidos",
+		});
 	}
 
 	if (!templates.verificationTemplate) {
 		logger.info("Plantilla de verificación no configurada");
-		return res
-			.status(500)
-			.json({
-				error: "Plantilla de verificación no configurada",
-			});
+		return res.status(500).json({
+			error: "Plantilla de verificación no configurada",
+		});
 	}
 
-	// obtiene los numeros de telefono incorrectos
-	const invalidNumbers = phoneNumbers
-		.filter(
-			(p) =>
-				!normalizeMexicanPhoneNumber(p.phoneNumber) ||
-				p.status === "verificado"
-		)
-		.map((p) => p.phoneNumber);
+    // Validar y normalizar números
+    const invalidNumbers = [];
+    const validatedBatch = [];
+
+    for (const item of phoneNumbers) {
+        const normalizedNumber = normalizeMexicanPhoneNumber(item.phoneNumber);
+        if (!normalizedNumber) {
+            invalidNumbers.push(item.phoneNumber);
+            continue;
+        }
+        if (item.status === "verificado") {
+            invalidNumbers.push(item.phoneNumber);
+            continue;
+        }
+        validatedBatch.push({
+            ...item,
+            phoneNumber: normalizedNumber
+        });
+    }
+
 	if (invalidNumbers.length > 0) {
-		logger.warn(
-			`Números inválidos detectados: ${invalidNumbers.join(
-				", "
-			)}`
-		);
+        logger.warn(`Números inválidos detectados: ${invalidNumbers.join(", ")}`);
 	}
-	// valida que los numeros de telefono sean correctos
-	const validatedBatch = phoneNumbers
-		.map((item) => {
-			const normalizedNumber = normalizeMexicanPhoneNumber(
-				item.phoneNumber
-			);
-			return normalizedNumber
-				? { ...item, phoneNumber: normalizedNumber }
-				: null;
-		})
-		.filter((item) => item !== null);
 
 	if (validatedBatch.length === 0) {
 		logger.info("No hay números válidos en el lote");
-		return res
-			.status(400)
-			.json({ error: "No hay números válidos en el lote" });
+        return res.status(400).json({ 
+            error: "No hay números válidos en el lote" 
+        });
 	}
 
 	const t = await db.sequelize.transaction();
+    const results = [];
+    const proccessTimer = [];
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-	// crea los numeros que no existe e ignora los que ya existen
+    try {
+        // Crear números que no existen
 	await db.PhoneNumbers.bulkCreate(
-		validatedBatch.map((num) => ({
+            validatedBatch.map(num => ({
 			phoneNumber: num.phoneNumber,
 			status: "por verificar",
 		})),
 		{
-			// updateOnDuplicate: ['status', 'updatedAt'],
 			ignoreDuplicates: true,
 			transaction: t,
 		}
 	);
 
-	const batchPhoneNumbers = validatedBatch.map(
-		(item) => item.phoneNumber
-	);
-
-	// Buscar números que ya existen
+        // Buscar números válidos para enviar mensajes
 	const validPhoneNumbers = await db.PhoneNumbers.findAll({
 		where: {
-			phoneNumber: batchPhoneNumbers,
+                phoneNumber: validatedBatch.map(item => item.phoneNumber),
 			hasReceivedVerificationMessage: false,
 			[Op.or]: [
 				{ status: "por verificar" },
@@ -258,227 +235,173 @@ router.post("/create-full-campaign", async (req, res) => {
 		transaction: t,
 		raw: true,
 	});
-	logger.info(
-		`Numeros validos: ${JSON.stringify(validPhoneNumbers, null, 2)}`
-	);
 
 	if (validPhoneNumbers.length === 0) {
-		logger.info("No hay números válidos en el lote");
-		return res
-			.status(400)
-			.json({ error: "No hay números válidos en el lote" });
+            logger.info("No hay números válidos para enviar mensajes");
+            await t.rollback();
+            return res.status(400).json({ 
+                error: "No hay números válidos para enviar mensajes" 
+            });
 	}
 
-	const proccessTimer = [];
-	try {
-		// 1. Crear la campaña
+        // Crear la campaña
 		const campaign = await db.Campaigns.create(
 			{
 				sentAt: new Date(),
 				templateUsed: templates.verificationTemplate.id,
-				createdByUser: 1, // Ajustar según la autenticación
+                createdByUser: 1,
 			},
 			{ transaction: t }
 		);
-		logger.info("Campaña creada con ID:", campaign.id);
 
-		const results = [];
-		const batchSize = BATCH_SIZE; // Procesar en lotes para mejor rendimiento
+        logger.info(`Campaña creada con ID: ${campaign.id}`);
 
-		for (let i = 0; i < validPhoneNumbers.length; i += batchSize) {
+        // Procesar números en lotes
+        const BATCH_SIZE = 10; // Tamaño de lote reducido para mejor manejo
+
+        for (let i = 0; i < validPhoneNumbers.length; i += BATCH_SIZE) {
+            const batch = validPhoneNumbers.slice(i, i + BATCH_SIZE);
+            const batchStartTime = Date.now();
+            const batchResults = [];
+
+            // Procesar cada número del lote con un retraso
+            for (const phone of batch) {
 			const startTime = Date.now();
-			const batch = validPhoneNumbers.slice(i, i + batchSize);
+                const numeroSinEspacio = phone.phoneNumber.replace(/\s/g, "");
 
-			// const batchPhoneNumbers = batch.map(item => item.phoneNumber);
-			// Buscar números que ya existen
-			// const existingPhones = await db.PhoneNumbers.findAll({
-			//     where: {
-			//         phoneNumber: batchPhoneNumbers
-			//     },
-			//     transaction: t,
-			//     raw: true
-			// });
-			// Filtrar números que ya existen
-			// const existingNumbers = new Set(existingPhones.map(p => p.phoneNumber));
-			// const newNumbers = validatedBatch.filter(numObj => !existingNumbers.has(numObj.phoneNumber));
+                try {
+                    // Esperar al menos 1.1 segundos entre mensajes
+                    if (i > 0 || batch.indexOf(phone) > 0) {
+                        await delay(1100);
+                    }
 
-			// Crear números que no existen
-			// if (newNumbers.length > 0) {
-			//     await db.PhoneNumbers.bulkCreate(
-			//         newNumbers.map(num => ({
-			//             phoneNumber: num.phoneNumber,
-			//             status: 'por verificar'
-			//         })),
-			//         { transaction: t, ignoreDuplicates: true }
-			//     );
-			// }
+                    logger.info(`Enviando mensaje a: ${numeroSinEspacio}`);
 
-			// Actualizar solo los números existentes a "por verificar"
-			// if (existingPhones.length > 0) {
-			//     await db.PhoneNumbers.update(
-			//         {
-			//             status: 'por verificar',
-			//             updatedAt: new Date()
-			//         },
-			//         {
-			//             where: {
-			//                 phoneNumber: existingPhones.map(p => p.phoneNumber)
-			//             },
-			//             transaction: t
-			//         }
-			//     );
-			// }
-
-			// 3. Obtener TODOS los números (nuevos + actualizados) que no han recibido mensaje
-			// const allPhones = await db.PhoneNumbers.findAll({
-			//     where: {
-			//         phoneNumber: batchPhoneNumbers,
-			//         hasReceivedVerificationMessage: false,
-			//         status: 'por verificar'
-			//     },
-			//     transaction: t
-			// });
-
-			if (batch.length > 0) {
-				// Crear mensajes para todos los números
-				await Promise.all(
-					batch.map(async (phone) => {
-						const numeroSinEspacio =
-							phone.phoneNumber.replace(
-								/\s/g,
-								""
-							);
-
-						const messageResult =
-							await sendMessages({
-								fromPhoneNumber:
-									whatsappNumber,
-								contentSid: templates
-									.verificationTemplate
-									.id,
-								contentVariables:
-									"",
+                    const messageResult = await sendMessages({
+                        fromPhoneNumber: whatsappNumber,
+                        contentSid: templates.verificationTemplate.id,
+                        contentVariables: "",
 								toPhoneNumber: `whatsapp:${numeroSinEspacio}`,
 								client: client,
 							});
-						logger.info(
-							`Informacion del mensaje enviado: ${JSON.stringify(
-								messageResult,
-								null,
-								2
-							)}`
-						);
+					
+					logger.info(
+						`Informacion del mensaje enviado: ${JSON.stringify(
+							messageResult,
+							null,
+							2
+						)}`
+					);
 
-						logger.info(
-							`Mensaje enviado con SID: ${messageResult.sid}`
-						);
-						logger.info(
-							`Mensaje enviado a: ${numeroSinEspacio}`
-						);
-						try {
-							const message =
-								await db.Messages.create(
-									{
-										phoneNumberId:
-											phone.id,
+					logger.info(
+						`Mensaje enviado con SID: ${messageResult.sid ? messageResult.sid : "No se envio"}`
+					);
+					logger.info(
+						`Mensaje enviado a: ${numeroSinEspacio}`
+					);
+                    // Crear registro del mensaje
+                    const message = await db.Messages.create({
+                        phoneNumberId: phone.id,
 										sentAt: new Date(),
-										templateUsed:
-											templates
-												.verificationTemplate
-												.id,
+                        templateUsed: templates.verificationTemplate.id,
 										twilioSid: messageResult.sid,
 										campaignId: campaign.id,
-									},
-									{
-										transaction:
-											t,
-									}
-								);
-							logger.info(
-								`Mensaje creado con ID: ${message.id}`
-							);
-							if (!message) {
-								results.push({
-									phoneNumber:
-										numeroSinEspacio,
-									status: "error",
-									error: "Error al crear el mensaje",
-								});
-								return null;
-							}
+                        success: true,
+                    }, { transaction: t });
 
-							const updatePhone =
+                    // Actualizar estado del teléfono
 								await db.PhoneNumbers.update(
+                        { hasReceivedVerificationMessage: true },
 									{
-										// status: 'por verificar',
-										hasReceivedVerificationMessage: true,
-									},
-									{
-										where: {
-											id: phone.id,
-										},
-										transaction:
-											t,
+                            where: { id: phone.id },
+                            transaction: t 
 									}
 								);
 
-							results.push({
-								phoneNumber:
-									numeroSinEspacio,
+                    const result = {
+                        phoneNumber: numeroSinEspacio,
 								status: "success",
 								messageId: message.id,
-							});
+                        twilioSid: messageResult.sid,
+                        duration: (Date.now() - startTime) / 1000
+                    };
 
-							return message;
+                    batchResults.push(result);
+                    results.push(result);
+                    logger.info(`Mensaje enviado correctamente a ${numeroSinEspacio}`);
+
 						} catch (error) {
-							results.push({
-								phoneNumber:
-									phone.phoneNumber,
+                    logger.error(`Error al enviar a ${numeroSinEspacio}:`, error);
+                    
+                    // Registrar el error en la base de datos
+                    try {
+                        await db.Messages.create({
+                            phoneNumberId: phone.id,
+                            sentAt: new Date(),
+                            templateUsed: templates.verificationTemplate.id,
+                            campaignId: campaign.id,
+                            messageStatus: "error",
+                        }, { transaction: t });
+                    } catch (dbError) {
+                        logger.error("Error al guardar mensaje fallido:", dbError);
+                    }
+
+                    const errorResult = {
+                        phoneNumber: numeroSinEspacio,
 								status: "error",
 								error: error.message,
-							});
-							return null;
+                        duration: (Date.now() - startTime) / 1000
+                    };
+                    
+                    batchResults.push(errorResult);
+                    results.push(errorResult);
 						}
-					})
-				);
-			}
+            }
 
-			const timerMessage = `Procesado lote de ${
-				batch.length
-			} números en ${(
-				(Date.now() - startTime) /
-				1000
-			).toFixed(2)} segundos`;
-			proccessTimer.push(timerMessage);
-			logger.info(timerMessage);
+            // Estadísticas del lote
+            const batchDuration = (Date.now() - batchStartTime) / 1000;
+            const successCount = batchResults.filter(r => r.status === "success").length;
+            const errorCount = batchResults.length - successCount;
+            
+            const batchStats = `Lote de ${batch.length} números: ${successCount} exitosos, ${errorCount} fallidos en ${batchDuration.toFixed(2)}s`;
+            proccessTimer.push(batchStats);
+            logger.info(batchStats);
 		}
 
+        // Confirmar la transacción
 		await t.commit();
 
+        // Estadísticas finales
+        const successCount = results.filter(r => r.status === "success").length;
+        const errorCount = results.filter(r => r.status === "error").length;
+        
 		return res.status(200).json({
 			success: true,
-			message: "Campaña creada exitosamente",
-			timer: proccessTimer,
+            message: `Campaña completada: ${successCount} mensajes enviados, ${errorCount} fallidos`,
 			campaignId: campaign.id,
 			invalidNumbers: invalidNumbers,
 			stats: {
 				total: results.length,
-				success: results.filter(
-					(r) => r.status === "success"
-				).length,
-				errors: results.filter(
-					(r) => r.status === "error"
-				).length,
+                success: successCount,
+                errors: errorCount,
 			},
-			results,
+            timer: proccessTimer,
+            results: results,
 		});
+
 	} catch (error) {
-		await t.rollback();
-		console.error("Error al crear la campaña:", error);
+        try {
+            await t.rollback();
+        } catch (rollbackError) {
+            logger.error("Error al hacer rollback:", rollbackError);
+        }
+        
+        logger.error("Error en la campaña:", error);
 		return res.status(500).json({
 			success: false,
-			message: "Error al crear la campaña",
-			details: error.message,
+            message: "Error al procesar la campaña",
+            error: error.message,
+            processedResults: results,
 		});
 	}
 });
