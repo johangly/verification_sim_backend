@@ -272,7 +272,7 @@ router.post("/create-full-campaign", async (req, res) => {
                 try {
                     // Esperar al menos 1.1 segundos entre mensajes
                     if (i > 0 || batch.indexOf(phone) > 0) {
-						await delay(1100);
+						await delay(200);
 						logger.info(`Esperando 1.1 segundos entre mensajes`);
                     }
 
