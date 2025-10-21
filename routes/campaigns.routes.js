@@ -204,7 +204,7 @@ router.post("/create-full-campaign", async (req, res) => {
         });
 	}
 
-	const t = await db.sequelize.transaction();
+	let t = await db.sequelize.transaction();
     const results = [];
     const proccessTimer = [];
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -311,13 +311,16 @@ router.post("/create-full-campaign", async (req, res) => {
                     }, { transaction: t });
 
                     // Actualizar estado del teléfono
-								await db.PhoneNumbers.update(
+                    await db.PhoneNumbers.update(
                         { hasReceivedVerificationMessage: true },
-									{
-                            where: { id: phone.id },
-                            transaction: t 
-									}
-								);
+                        { where: { id: phone.id }, transaction: t }
+                    );
+
+                    // Confirmar la transacción para el mensaje actual
+                    await t.commit();
+                    
+                    // Iniciar nueva transacción para el siguiente mensaje
+                    t = await db.sequelize.transaction();
 
                     const result = {
                         phoneNumber: numeroSinEspacio,
@@ -347,10 +350,21 @@ router.post("/create-full-campaign", async (req, res) => {
                         logger.error("Error al guardar mensaje fallido:", dbError);
                     }
 
+                    // Hacer rollback de la transacción fallida
+                    try {
+                        await t.rollback();
+                        // Iniciar nueva transacción para el siguiente mensaje
+                        t = await db.sequelize.transaction();
+                    } catch (rollbackError) {
+                        logger.error("Error al hacer rollback o reiniciar transacción:", rollbackError);
+                        // Intentar continuar con una nueva transacción incluso si falla el rollback
+                        t = await db.sequelize.transaction();
+                    }
+
                     const errorResult = {
                         phoneNumber: numeroSinEspacio,
-						status: "failed",
-						error: error.message,
+                        status: "failed",
+                        error: error.message,
                         duration: (Date.now() - startTime) / 1000
                     };
                     
@@ -368,9 +382,6 @@ router.post("/create-full-campaign", async (req, res) => {
             proccessTimer.push(batchStats);
             logger.info(batchStats);
 		}
-
-        // Confirmar la transacción
-		await t.commit();
 
         // Estadísticas finales
         const successCount = results.filter(r => r.status === "success").length;
