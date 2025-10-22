@@ -135,7 +135,7 @@ router.use(express.json());
 
 router.post("/create-full-campaign", async (req, res) => {
   const { phoneNumbers } = req.body;
-
+  logger.info(`${phoneNumbers.length} numeros recibidos para enviar`);
   if (
     !phoneNumbers.every(
       (p) => p.phoneNumber && typeof p.phoneNumber === "string"
@@ -184,7 +184,8 @@ router.post("/create-full-campaign", async (req, res) => {
       phoneNumber: normalizedNumber,
     });
   }
-
+  logger.info(`validatedBatch: ${validatedBatch}`);
+  logger.info(`invalidNumbers: ${invalidNumbers}`);
   if (invalidNumbers.length > 0) {
     logger.warn(`Números inválidos detectados: ${invalidNumbers.join(", ")}`);
   }
@@ -224,6 +225,8 @@ router.post("/create-full-campaign", async (req, res) => {
       transaction: t,
       raw: true,
     });
+
+    logger.info(`validPhoneNumbers: ${validPhoneNumbers.length}`);
 
     if (validPhoneNumbers.length === 0) {
       logger.info("No hay números válidos para enviar mensajes");
